@@ -58,18 +58,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * @returns Object containing error (if any) and whether email confirmation is required
    */
   const signUp = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: window.location.origin + '/auth/callback'
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`
+        }
+      });
+      
+      if (error) {
+        console.error('Sign up error:', error);
       }
-    });
-    
-    return {
-      error,
-      confirmationRequired: data?.user?.identities?.length === 0 || data?.user?.confirmed_at === null
-    };
+      
+      return {
+        error,
+        confirmationRequired: data?.user?.identities?.length === 0 || data?.user?.confirmed_at === null
+      };
+    } catch (err) {
+      console.error('Sign up error:', err);
+      return {
+        error: err as AuthError,
+        confirmationRequired: false
+      };
+    }
   };
 
   /**

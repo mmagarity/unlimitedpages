@@ -12,16 +12,11 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase configuration')
 }
 
-// Create Supabase client with explicit headers
+// Create Supabase client with auth configuration
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true
-  },
-  global: {
-    headers: {
-      'apikey': supabaseAnonKey
-    }
   }
 })
