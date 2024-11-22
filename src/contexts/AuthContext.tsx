@@ -61,11 +61,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('Starting sign up process for:', email);
       
-      // Verify Supabase client is properly initialized
-      if (!supabase.auth) {
-        throw new Error('Supabase client not properly initialized');
+      // First, check if user exists
+      const { data: existingUser } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .single();
+
+      if (existingUser) {
+        return {
+          error: {
+            message: 'An account with this email already exists. Please sign in instead.',
+            name: 'UserExistsError',
+            status: 400
+          } as AuthError,
+          confirmationRequired: false
+        };
       }
 
+      // Proceed with sign up
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -79,6 +93,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (error) {
         console.error('Supabase sign up error:', error);
+        
+        // Handle specific error cases
+        if (error.message.includes('Database error')) {
+          return {
+            error: {
+              message: 'Unable to create account at this time. Please try again later.',
+              name: 'DatabaseError',
+              status: 500
+            } as AuthError,
+            confirmationRequired: false
+          };
+        }
+        
         return {
           error,
           confirmationRequired: false
@@ -91,6 +118,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         confirmed: data?.user?.confirmed_at
       });
       
+      // Create profile entry
+      if (data?.user?.id) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert([
+            {
+              id: data.user.id,
+              email: email,
+              created_at: new Date().toISOString()
+            }
+          ]);
+
+        if (profileError) {
+          console.error('Error creating profile:', profileError);
+        }
+      }
+      
       return {
         error: null,
         confirmationRequired: data?.user?.identities?.length === 0 || data?.user?.confirmed_at === null
@@ -98,7 +142,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err) {
       console.error('Unexpected sign up error:', err);
       return {
-        error: err as AuthError,
+        error: {
+          message: 'An unexpected error occurred. Please try again.',
+          name: 'UnexpectedError',
+          status: 500
+        } as AuthError,
         confirmationRequired: false
       };
     }
