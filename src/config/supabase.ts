@@ -1,32 +1,27 @@
 /**
  * Supabase Client Configuration
  * This file initializes and exports the Supabase client for use throughout the application
- * 
- * Environment Variables Required:
- * - VITE_SUPABASE_URL: Your Supabase project URL
- * - VITE_SUPABASE_ANON_KEY: Your Supabase project's anon key
  */
 
 import { createClient } from '@supabase/supabase-js'
 
-// Get environment variables, with fallback to process.env for production
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || process.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
+const supabaseUrl = 'https://bjffotfpudthwkezppub.supabase.co'
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqZmZvdGZwdWR0aHdrZXpwcHViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDk5MjQ2MDUsImV4cCI6MjAyNTUwMDYwNX0.Nt0YPjEZ6qkOTBFCQQJxlhVFYvTJBLFgUVNdZNPvvBE'
 
-// Validate environment variables
-if (!supabaseUrl) {
-  throw new Error('Missing Supabase URL. Please check your environment variables.')
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase configuration')
 }
 
-if (!supabaseAnonKey) {
-  throw new Error('Missing Supabase Anon Key. Please check your environment variables.')
-}
-
-// Create and export Supabase client with additional options
+// Create Supabase client with explicit headers
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true
+  },
+  global: {
+    headers: {
+      'apikey': supabaseAnonKey
+    }
   }
 })
