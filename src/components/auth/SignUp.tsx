@@ -9,7 +9,7 @@ import { Link, useNavigate } from 'react-router-dom';
  * - Email/password form validation
  * - Password confirmation check
  * - Error handling with notifications
- * - Automatic redirect to payment page after successful signup
+ * - Email confirmation flow
  * - Loading state management
  */
 export const SignUp: React.FC = () => {
@@ -20,6 +20,7 @@ export const SignUp: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
   
   // Hooks
   const { signUp } = useAuth();
@@ -28,12 +29,13 @@ export const SignUp: React.FC = () => {
   /**
    * Handle form submission
    * Validates passwords match, creates new user account,
-   * and redirects to payment page on success
+   * and handles email confirmation flow
    */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccess(false);
+    setEmailSent(false);
     
     // Validate passwords match
     if (password !== confirmPassword) {
@@ -41,12 +43,33 @@ export const SignUp: React.FC = () => {
       return;
     }
 
+    // Validate password strength
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      return;
+    }
+
     try {
       setLoading(true);
-      await signUp(email, password);
+      const { error, confirmationRequired } = await signUp(email, password);
+      
+      if (error) {
+        if (error.message.includes('already registered')) {
+          setError('An account with this email already exists. Please sign in instead.');
+        } else {
+          setError(error.message);
+        }
+        return;
+      }
+
       setSuccess(true);
-      // Redirect to payment page after successful signup
-      navigate('/payment');
+      
+      if (confirmationRequired) {
+        setEmailSent(true);
+      } else {
+        // If email confirmation is not required, redirect to payment
+        navigate('/payment');
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to sign up');
     } finally {
@@ -75,7 +98,7 @@ export const SignUp: React.FC = () => {
           )}
 
           {/* Success Message */}
-          {success && (
+          {success && emailSent && (
             <div className="bg-green-50 border-l-4 border-green-400 p-4 mb-4">
               <div className="flex">
                 <div className="flex-shrink-0">
@@ -84,7 +107,9 @@ export const SignUp: React.FC = () => {
                   </svg>
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm text-green-700">Successfully signed up! Please check your email to confirm your account.</p>
+                  <p className="text-sm text-green-700">
+                    Success! Please check your email for a confirmation link to complete your registration.
+                  </p>
                 </div>
               </div>
             </div>
@@ -102,6 +127,7 @@ export const SignUp: React.FC = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              disabled={loading}
             />
           </div>
           
@@ -117,9 +143,10 @@ export const SignUp: React.FC = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              disabled={loading}
             />
           </div>
-          
+
           {/* Confirm Password Input */}
           <div>
             <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
@@ -132,34 +159,27 @@ export const SignUp: React.FC = () => {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              disabled={loading}
             />
           </div>
-          
+
           {/* Submit Button */}
           <button
             type="submit"
             disabled={loading}
-            className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+            className={`w-full py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
               loading ? 'opacity-50 cursor-not-allowed' : ''
             }`}
           >
-            {loading ? (
-              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-            ) : null}
-            Sign Up
+            {loading ? 'Creating Account...' : 'Sign Up'}
           </button>
-          
-          {/* Navigation Links */}
+
+          {/* Sign In Link */}
           <div className="text-sm text-center">
-            <p>
-              Already have an account?{' '}
-              <Link to="/signin" className="text-blue-600 hover:text-blue-500">
-                Sign In
-              </Link>
-            </p>
+            Already have an account?{' '}
+            <Link to="/signin" className="font-medium text-blue-600 hover:text-blue-500">
+              Sign in
+            </Link>
           </div>
         </form>
       </div>

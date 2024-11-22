@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User } from '@supabase/supabase-js';
+import { User, AuthError } from '@supabase/supabase-js';
 import { supabase } from '../config/supabase';
 
 /**
@@ -9,7 +9,7 @@ import { supabase } from '../config/supabase';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  signUp: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<{ error: AuthError | null; confirmationRequired: boolean }>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -55,13 +55,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * Sign up new user
    * @param email - User's email
    * @param password - User's password
+   * @returns Object containing error (if any) and whether email confirmation is required
    */
   const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        emailRedirectTo: window.location.origin + '/auth/callback'
+      }
     });
-    if (error) throw error;
+    
+    return {
+      error,
+      confirmationRequired: data?.user?.identities?.length === 0 || data?.user?.confirmed_at === null
+    };
   };
 
   /**
