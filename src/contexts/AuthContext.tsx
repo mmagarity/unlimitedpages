@@ -59,24 +59,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    */
   const signUp = async (email: string, password: string) => {
     try {
+      console.log('Starting sign up process for:', email);
+      
+      // Verify Supabase client is properly initialized
+      if (!supabase.auth) {
+        throw new Error('Supabase client not properly initialized');
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          data: {
+            email_confirm: true
+          }
         }
       });
       
       if (error) {
-        console.error('Sign up error:', error);
+        console.error('Supabase sign up error:', error);
+        return {
+          error,
+          confirmationRequired: false
+        };
       }
+
+      console.log('Sign up response:', {
+        user: data?.user?.id,
+        identities: data?.user?.identities?.length,
+        confirmed: data?.user?.confirmed_at
+      });
       
       return {
-        error,
+        error: null,
         confirmationRequired: data?.user?.identities?.length === 0 || data?.user?.confirmed_at === null
       };
     } catch (err) {
-      console.error('Sign up error:', err);
+      console.error('Unexpected sign up error:', err);
       return {
         error: err as AuthError,
         confirmationRequired: false

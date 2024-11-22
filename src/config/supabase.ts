@@ -18,11 +18,25 @@ if (!supabaseAnonKey) {
   throw new Error('Missing VITE_SUPABASE_ANON_KEY environment variable')
 }
 
+console.log('Initializing Supabase client with:', {
+  url: supabaseUrl,
+  keyLength: supabaseAnonKey?.length
+})
+
 // Create Supabase client with auth configuration
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: true,
+    storageKey: 'supabase.auth.token',
+    storage: window.localStorage,
+    flowType: 'pkce'
+  },
+  global: {
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${supabaseAnonKey}`
+    }
   }
 })
