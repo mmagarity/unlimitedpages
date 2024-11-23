@@ -12,7 +12,7 @@ interface AuthContextType {
   signUp: (email: string, password: string) => Promise<{ error: AuthError | null; confirmationRequired: boolean }>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<boolean>;
 }
 
 // Create the authentication context
@@ -171,27 +171,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('Attempting password reset for:', email);
 
-      // Send reset email with specific options
-      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-        captchaToken: undefined,
+      // Basic reset password configuration
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`
       });
 
       if (error) {
-        console.error('Password reset error:', error);
-        // Check for specific error types
-        if (error.message?.includes('rate limit')) {
-          throw new Error('Too many attempts. Please try again in a few minutes.');
-        } else if (error.status === 500) {
-          throw new Error('Service temporarily unavailable. Please try again later.');
-        } else if (error.status === 422) {
-          throw new Error('Invalid email format. Please check your email address.');
-        } else {
-          throw error;
+        console.error('Password reset error details:', {
+          message: error.message,
+          status: error.status,
+          name: error.name
+        });
+        
+        // Check if it's a network or service error
+        if (!navigator.onLine) {
+          throw new Error('Please check your internet connection and try again.');
+        }
+        
+        // Handle specific error cases
+        switch (error.status) {
+          case 422:
+            throw new Error('Please enter a valid email address.');
+          case 429:
+            throw new Error('Too many attempts. Please try again in a few minutes.');
+          case 500:
+          case 503:
+            throw new Error('Service is temporarily unavailable. Please try again in a few minutes.');
+          default:
+            if (error.message.includes('User not found')) {
+              throw new Error('No account found with this email address.');
+            } else {
+              throw new Error('Unable to send reset email. Please try again later.');
+            }
         }
       }
 
-      console.log('Password reset email sent successfully');
+      console.log('Password reset email request successful');
+      return true;
     } catch (err) {
       console.error('Password reset failed:', err);
       throw err;
