@@ -31,12 +31,30 @@ export const ResetPassword: React.FC = () => {
     setError(null);
     setSuccess(false);
     
+    if (!email.trim()) {
+      setError('Please enter your email address');
+      return;
+    }
+    
     try {
       setLoading(true);
       await resetPassword(email);
       setSuccess(true);
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to reset password');
+      setEmail(''); // Clear email after successful request
+    } catch (err) {
+      console.error('Reset password error:', err);
+      if (err instanceof Error) {
+        // Handle specific error messages
+        if (err.message.includes('No account found')) {
+          setError('No account found with this email address.');
+        } else if (err.message.includes('rate limit')) {
+          setError('Too many attempts. Please try again later.');
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError('Failed to reset password. Please try again later.');
+      }
     } finally {
       setLoading(false);
     }

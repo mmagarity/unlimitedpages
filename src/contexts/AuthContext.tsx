@@ -168,8 +168,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * @param email - User's email
    */
   const resetPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
-    if (error) throw error;
+    try {
+      console.log('Attempting password reset for:', email);
+
+      // Send reset email with specific options
+      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+        captchaToken: undefined,
+      });
+
+      if (error) {
+        console.error('Password reset error:', error);
+        // Check for specific error types
+        if (error.message?.includes('rate limit')) {
+          throw new Error('Too many attempts. Please try again in a few minutes.');
+        } else if (error.status === 500) {
+          throw new Error('Service temporarily unavailable. Please try again later.');
+        } else if (error.status === 422) {
+          throw new Error('Invalid email format. Please check your email address.');
+        } else {
+          throw error;
+        }
+      }
+
+      console.log('Password reset email sent successfully');
+    } catch (err) {
+      console.error('Password reset failed:', err);
+      throw err;
+    }
   };
 
   // Create context value object
