@@ -70,36 +70,20 @@ function App() {
               </ProtectedRoute>
             }
           />
+          
+          {/* Settings Routes */}
           <Route
             path="/settings"
             element={
               <ProtectedRoute>
-                <SettingsLayout>
-                  <Settings />
-                </SettingsLayout>
+                <SettingsLayout />
               </ProtectedRoute>
             }
-          />
-          <Route
-            path="/webflow"
-            element={
-              <ProtectedRoute>
-                <SettingsLayout>
-                  <WebflowIntegration />
-                </SettingsLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/usage"
-            element={
-              <ProtectedRoute>
-                <SettingsLayout>
-                  <UsageBilling />
-                </SettingsLayout>
-              </ProtectedRoute>
-            }
-          />
+          >
+            <Route index element={<Settings />} />
+            <Route path="webflow" element={<WebflowIntegration />} />
+            <Route path="usage" element={<UsageBilling />} />
+          </Route>
           
           {/* Default Route */}
           <Route path="*" element={<Navigate to="/" replace />} />

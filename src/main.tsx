@@ -3,7 +3,6 @@ import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import { validateEnv } from './utils/validateEnv';
-import theme from './theme';
 
 // Validate environment variables
 try {
