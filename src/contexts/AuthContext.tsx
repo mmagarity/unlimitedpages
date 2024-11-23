@@ -61,14 +61,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('Starting sign up process for:', email);
       
-      // First, check if user exists
-      const { data: existingUser } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('email', email)
-        .single();
+      // First, check if user exists - using auth API instead of direct DB query
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: 'dummy-password-for-check'
+      });
 
-      if (existingUser) {
+      if (!signInError || (signInError && !signInError.message.includes('Invalid login credentials'))) {
         return {
           error: {
             message: 'An account with this email already exists. Please sign in instead.',
@@ -93,19 +92,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (error) {
         console.error('Supabase sign up error:', error);
-        
-        // Handle specific error cases
-        if (error.message.includes('Database error')) {
-          return {
-            error: {
-              message: 'Unable to create account at this time. Please try again later.',
-              name: 'DatabaseError',
-              status: 500
-            } as AuthError,
-            confirmationRequired: false
-          };
-        }
-        
         return {
           error,
           confirmationRequired: false
@@ -118,20 +104,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         confirmed: data?.user?.confirmed_at
       });
       
-      // Create profile entry
+      // Only create profile if we have a user ID
       if (data?.user?.id) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([
-            {
-              id: data.user.id,
-              email: email,
-              created_at: new Date().toISOString()
-            }
-          ]);
+        try {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert([
+              {
+                id: data.user.id,
+                email: email,
+                created_at: new Date().toISOString()
+              }
+            ]);
 
-        if (profileError) {
-          console.error('Error creating profile:', profileError);
+          if (profileError) {
+            console.error('Error creating profile:', profileError);
+          }
+        } catch (profileErr) {
+          console.error('Unexpected error creating profile:', profileErr);
         }
       }
       
