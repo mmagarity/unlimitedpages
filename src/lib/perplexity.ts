@@ -213,17 +213,29 @@ Required Format (return as JSON):
     }
 
     const data = await response.json();
+    console.log('Raw API response:', data);
+
+    if (!data || typeof data !== 'object') {
+      console.error('Invalid response data:', data);
+      throw new Error('Invalid response format from API');
+    }
+
     const content = data.choices?.[0]?.message?.content;
+    console.log('Content from response:', content);
     
-    if (!content) {
-      throw new Error('Invalid response format from Perplexity API');
+    if (!content || typeof content !== 'string') {
+      console.error('Invalid content format:', content);
+      throw new Error('Invalid content format in API response');
     }
 
     try {
-      return JSON.parse(content);
+      const parsedContent = JSON.parse(content);
+      console.log('Parsed content:', parsedContent);
+      return parsedContent;
     } catch (error) {
-      console.error('Failed to parse Perplexity response:', error);
-      throw new Error('Invalid response format from Perplexity API');
+      console.error('Failed to parse content:', error);
+      console.error('Content that failed to parse:', content);
+      throw new Error('Failed to parse API response content');
     }
   } catch (error) {
     console.error('Error generating content with Perplexity:', error);
@@ -586,17 +598,29 @@ Format the response as a JSON object with the following structure:
     }
 
     const data = await response.json();
+    console.log('Raw API response:', data);
+
+    if (!data || typeof data !== 'object') {
+      console.error('Invalid response data:', data);
+      throw new Error('Invalid response format from API');
+    }
+
     const content = data.choices?.[0]?.message?.content;
+    console.log('Content from response:', content);
     
-    if (!content) {
-      throw new Error('Invalid response format from Perplexity API');
+    if (!content || typeof content !== 'string') {
+      console.error('Invalid content format:', content);
+      throw new Error('Invalid content format in API response');
     }
 
     try {
-      return JSON.parse(content);
+      const parsedContent = JSON.parse(content);
+      console.log('Parsed content:', parsedContent);
+      return parsedContent;
     } catch (error) {
-      console.error('Failed to parse Perplexity response:', error);
-      throw new Error('Invalid response format from Perplexity API');
+      console.error('Failed to parse content:', error);
+      console.error('Content that failed to parse:', content);
+      throw new Error('Failed to parse API response content');
     }
   } catch (error) {
     console.error('Error generating content with Perplexity:', error);

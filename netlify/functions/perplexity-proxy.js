@@ -18,6 +18,8 @@ exports.handler = async function(event, context) {
       throw new Error('API key not configured');
     }
 
+    console.log('Request body:', JSON.stringify(body, null, 2));
+
     // Create the request options
     const options = {
       hostname: 'api.perplexity.ai',
@@ -39,28 +41,47 @@ exports.handler = async function(event, context) {
         });
 
         res.on('end', () => {
-          resolve({
-            statusCode: res.statusCode,
-            statusMessage: res.statusMessage,
-            headers: res.headers,
-            data: JSON.parse(data)
-          });
+          try {
+            const parsedData = JSON.parse(data);
+            console.log('API Response:', JSON.stringify(parsedData, null, 2));
+            
+            resolve({
+              statusCode: res.statusCode,
+              statusMessage: res.statusMessage,
+              headers: res.headers,
+              data: parsedData
+            });
+          } catch (error) {
+            console.error('Failed to parse API response:', error);
+            console.log('Raw response:', data);
+            reject(new Error('Invalid JSON response from API'));
+          }
         });
       });
 
       req.on('error', (error) => {
+        console.error('Request error:', error);
         reject(error);
       });
 
-      // Write request body
-      req.write(JSON.stringify(body));
-      req.end();
+      // Write request body and handle errors
+      try {
+        req.write(JSON.stringify(body));
+        req.end();
+      } catch (error) {
+        console.error('Error writing request:', error);
+        reject(error);
+      }
     });
 
     // Handle non-200 responses
     if (response.statusCode !== 200) {
-      console.error('Perplexity API error:', response.data);
-      throw new Error(`Perplexity API error: ${response.statusCode} ${response.statusMessage}`);
+      console.error('API error response:', {
+        statusCode: response.statusCode,
+        statusMessage: response.statusMessage,
+        data: response.data
+      });
+      throw new Error(`API error: ${response.statusCode} ${response.statusMessage}`);
     }
 
     return {
@@ -82,7 +103,8 @@ exports.handler = async function(event, context) {
       },
       body: JSON.stringify({ 
         error: error.message,
-        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+        timestamp: new Date().toISOString()
       })
     };
   }
