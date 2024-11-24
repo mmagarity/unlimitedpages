@@ -589,6 +589,7 @@ Format the response as a JSON object with the following structure:
       });
       
       if (process.env.NODE_ENV === 'development') {
+        console.log('Using mock response in development');
         return mockPerplexityResponse(headline);
       }
       
