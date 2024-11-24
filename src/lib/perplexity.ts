@@ -213,7 +213,18 @@ Required Format (return as JSON):
     }
 
     const data = await response.json();
-    return data;
+    const content = data.choices?.[0]?.message?.content;
+    
+    if (!content) {
+      throw new Error('Invalid response format from Perplexity API');
+    }
+
+    try {
+      return JSON.parse(content);
+    } catch (error) {
+      console.error('Failed to parse Perplexity response:', error);
+      throw new Error('Invalid response format from Perplexity API');
+    }
   } catch (error) {
     console.error('Error generating content with Perplexity:', error);
     if (process.env.NODE_ENV === 'development') {
@@ -575,7 +586,18 @@ Format the response as a JSON object with the following structure:
     }
 
     const data = await response.json();
-    return data;
+    const content = data.choices?.[0]?.message?.content;
+    
+    if (!content) {
+      throw new Error('Invalid response format from Perplexity API');
+    }
+
+    try {
+      return JSON.parse(content);
+    } catch (error) {
+      console.error('Failed to parse Perplexity response:', error);
+      throw new Error('Invalid response format from Perplexity API');
+    }
   } catch (error) {
     console.error('Error generating content with Perplexity:', error);
     if (process.env.NODE_ENV === 'development') {
