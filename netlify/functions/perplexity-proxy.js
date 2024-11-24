@@ -1,4 +1,4 @@
-const fetch = require('node-fetch');
+const fetch = (await import('node-fetch')).default;
 
 exports.handler = async function(event, context) {
   // Only allow POST requests
@@ -10,11 +10,15 @@ exports.handler = async function(event, context) {
   }
 
   try {
+    // Dynamically import node-fetch
+    const fetch = (await import('node-fetch')).default;
+    
     const body = JSON.parse(event.body);
     const apiKey = process.env.VITE_PERPLEXITY_API_KEY;
 
     if (!apiKey) {
-      throw new Error('Missing Perplexity API key');
+      console.error('Missing API key in environment');
+      throw new Error('API key not configured');
     }
 
     const response = await fetch('https://api.perplexity.ai/chat/completions', {
@@ -27,6 +31,11 @@ exports.handler = async function(event, context) {
     });
 
     const data = await response.json();
+
+    if (!response.ok) {
+      console.error('Perplexity API error:', data);
+      throw new Error(`Perplexity API error: ${response.status} ${response.statusText}`);
+    }
 
     return {
       statusCode: response.status,
@@ -45,7 +54,10 @@ exports.handler = async function(event, context) {
       headers: {
         'Access-Control-Allow-Origin': '*'
       },
-      body: JSON.stringify({ error: error.message })
+      body: JSON.stringify({ 
+        error: error.message,
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      })
     };
   }
 };

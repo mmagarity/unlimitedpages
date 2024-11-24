@@ -197,22 +197,30 @@ Required Format (return as JSON):
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => null);
+      console.error('Perplexity API error:', {
+        status: response.status,
+        statusText: response.statusText,
+        data: errorData
+      });
+      
+      if (process.env.NODE_ENV === 'development') {
+        return mockPerplexityResponse(headline);
+      }
+      
       throw new Error(
-        `Perplexity API error: ${response.status} ${response.statusText}${
-          errorData ? ` - ${JSON.stringify(errorData)}` : ''
-        }`
+        `Content generation failed: ${errorData?.error || response.statusText}`
       );
     }
 
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error('Perplexity API call failed:', error);
-    throw new Error(
-      error instanceof Error 
-        ? `Failed to generate location-specific content: ${error.message}`
-        : 'Failed to generate location-specific content'
-    );
+    console.error('Error generating content with Perplexity:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Using mock response in development');
+      return mockPerplexityResponse(headline);
+    }
+    throw error;
   }
 }
 
@@ -551,24 +559,26 @@ Format the response as a JSON object with the following structure:
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => null);
+      console.error('Perplexity API error:', {
+        status: response.status,
+        statusText: response.statusText,
+        data: errorData
+      });
+      
+      if (process.env.NODE_ENV === 'development') {
+        return mockPerplexityResponse(headline);
+      }
+      
       throw new Error(
-        `Perplexity API error: ${response.status} ${response.statusText}${
-          errorData ? ` - ${JSON.stringify(errorData)}` : ''
-        }`
+        `Content generation failed: ${errorData?.error || response.statusText}`
       );
     }
 
     const data = await response.json();
-    const content = data.choices[0]?.message?.content;
-    
-    if (!content) {
-      throw new Error('No response from Perplexity AI');
-    }
-
-    return JSON.parse(content);
+    return data;
   } catch (error) {
     console.error('Error generating content with Perplexity:', error);
-    if (!PERPLEXITY_API_KEY || process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV === 'development') {
       console.log('Using mock response in development');
       return mockPerplexityResponse(headline);
     }
