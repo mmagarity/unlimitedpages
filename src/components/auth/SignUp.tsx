@@ -49,29 +49,57 @@ export const SignUp: React.FC = () => {
       return;
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
     try {
       setLoading(true);
+      console.log('Starting sign up process for:', email);
+      
       const { error, confirmationRequired } = await signUp(email, password);
       
       if (error) {
-        if (error.message.includes('already registered')) {
+        console.error('Sign up error:', {
+          message: error.message,
+          status: error.status,
+          name: error.name
+        });
+        
+        if (error.message.includes('already registered') || error.message.includes('already exists')) {
           setError('An account with this email already exists. Please sign in instead.');
+        } else if (error.message.includes('rate limit')) {
+          setError('Too many attempts. Please try again in a few minutes.');
+        } else if (error.message.includes('invalid email')) {
+          setError('Please enter a valid email address.');
+        } else if (error.message.includes('weak password')) {
+          setError('Password is too weak. Please use a stronger password.');
         } else {
-          setError(error.message);
+          setError(error.message || 'Failed to create account. Please try again.');
         }
         return;
       }
+
+      console.log('Sign up successful:', {
+        confirmationRequired,
+        email
+      });
 
       setSuccess(true);
       
       if (confirmationRequired) {
         setEmailSent(true);
+        console.log('Confirmation email required, waiting for user to verify');
       } else {
-        // If email confirmation is not required, redirect to payment
-        navigate('/payment');
+        console.log('No confirmation required, redirecting to payment');
+        navigate('/payment', { replace: true });
       }
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to sign up');
+      console.error('Unexpected error during sign up:', error);
+      setError(error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
     }

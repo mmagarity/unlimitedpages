@@ -2,71 +2,82 @@ import React, { useState, useCallback } from 'react';
 import { ShoppingCart, Trash2, Plus, AlertCircle, ListFilter } from 'lucide-react';
 import type { HeadlineTemplate, HeadlineVariation } from '../types';
 import { generateHeadlineSuggestions } from '../utils/headlineUtils';
+import { useWorkflowStore } from '../store/workflowStore';
+import { ARTICLE_TYPES } from '../data/articleTypes';
 
 interface HeadlineGeneratorProps {
-  selectedTemplates: HeadlineTemplate[];
   onHeadlinesGenerated: (headlines: HeadlineVariation[]) => void;
   selectedHeadlines: HeadlineVariation[];
-  onAddMoreTypes: () => void;
-  currentArticleType: string;
-  onHeadlineAdded: (headline: HeadlineVariation) => void;
-  onHeadlineRemoved: (id: string) => void;
 }
 
-export function HeadlineGenerator({ 
-  selectedTemplates, 
+const getTemplatesForType = (articleTypeId: string): HeadlineTemplate[] => {
+  const articleType = ARTICLE_TYPES.find(type => type.id === articleTypeId);
+  return articleType?.templates || [];
+};
+
+export function HeadlineGenerator({
   onHeadlinesGenerated,
-  selectedHeadlines: initialSelectedHeadlines,
-  onAddMoreTypes,
-  currentArticleType,
-  onHeadlineAdded,
-  onHeadlineRemoved
+  selectedHeadlines: initialSelectedHeadlines = [],
 }: HeadlineGeneratorProps) {
+  const { selectedTypes, setCurrentStep } = useWorkflowStore();
+  const currentArticleType = selectedTypes[0];
+  const selectedTemplates = currentArticleType ? getTemplatesForType(currentArticleType.id) : [];
+  
   const [keyword, setKeyword] = useState('');
   const [suggestions, setSuggestions] = useState<HeadlineVariation[]>([]);
   const [showAllHeadlines, setShowAllHeadlines] = useState(false);
-
-  // Filter templates by current article type
-  const currentTemplates = selectedTemplates.filter(
-    template => template.articleType === currentArticleType
-  );
+  const [selectedHeadlines, setSelectedHeadlines] = useState<HeadlineVariation[]>(initialSelectedHeadlines);
 
   const generateSuggestions = useCallback(() => {
-    if (!keyword.trim()) return;
+    if (!keyword.trim() || !selectedTemplates.length) return;
 
-    const existingHeadlines = new Set(initialSelectedHeadlines.map(h => h.baseHeadline));
+    const existingHeadlines = new Set(selectedHeadlines.map(h => h.baseHeadline));
     const newSuggestions = generateHeadlineSuggestions(
-      currentTemplates,
+      selectedTemplates,
       keyword.trim(),
       existingHeadlines
     );
 
     setSuggestions(newSuggestions);
-  }, [keyword, currentTemplates, initialSelectedHeadlines]);
+  }, [keyword, selectedTemplates, selectedHeadlines]);
 
   const addToCart = useCallback((headline: HeadlineVariation) => {
     const newHeadline = {
       ...headline,
       selected: true,
-      articleType: currentArticleType
+      articleType: currentArticleType.id
     };
-    onHeadlineAdded(newHeadline);
+    setSelectedHeadlines(prev => [...prev, newHeadline]);
     setSuggestions(prev => prev.filter(h => h.id !== headline.id));
-  }, [currentArticleType, onHeadlineAdded]);
+  }, [currentArticleType]);
 
   const removeFromCart = useCallback((id: string) => {
-    onHeadlineRemoved(id);
-  }, [onHeadlineRemoved]);
+    setSelectedHeadlines(prev => prev.filter(h => h.id !== id));
+  }, []);
 
   const handleContinue = useCallback(() => {
-    if (initialSelectedHeadlines.length > 0) {
-      onHeadlinesGenerated(initialSelectedHeadlines);
+    if (selectedHeadlines.length > 0) {
+      onHeadlinesGenerated(selectedHeadlines);
     }
-  }, [initialSelectedHeadlines, onHeadlinesGenerated]);
+  }, [selectedHeadlines, onHeadlinesGenerated]);
+
+  const handleAddMoreTypes = () => {
+    setCurrentStep(0);
+  };
 
   const filteredHeadlines = showAllHeadlines 
-    ? initialSelectedHeadlines 
-    : initialSelectedHeadlines.filter(h => h.articleType === currentArticleType);
+    ? selectedHeadlines 
+    : selectedHeadlines.filter(h => h.articleType === currentArticleType.id);
+
+  if (!currentArticleType) {
+    return (
+      <div className="p-6 text-center">
+        <AlertCircle className="mx-auto h-12 w-12 text-yellow-500" />
+        <h3 className="mt-2 text-lg font-semibold text-gray-900">No Article Type Selected</h3>
+        <p className="mt-1 text-sm text-gray-500">Please go back and select an article type to continue.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-6xl mx-auto">
@@ -144,7 +155,7 @@ export function HeadlineGenerator({
                   {showAllHeadlines ? 'Show Current Type' : 'Show All'}
                 </button>
                 <span className="text-sm text-blue-600 font-medium">
-                  {initialSelectedHeadlines.length}/15 recommended
+                  {selectedHeadlines.length}/15 recommended
                 </span>
               </div>
             </div>
@@ -175,10 +186,10 @@ export function HeadlineGenerator({
               </div>
             )}
 
-            {initialSelectedHeadlines.length > 0 && (
+            {selectedHeadlines.length > 0 && (
               <div className="mt-6 flex gap-4">
                 <button
-                  onClick={onAddMoreTypes}
+                  onClick={handleAddMoreTypes}
                   className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                 >
                   <Plus className="w-4 h-4 inline mr-2" />
@@ -188,7 +199,7 @@ export function HeadlineGenerator({
                   onClick={handleContinue}
                   className="flex-1 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                 >
-                  Continue with {initialSelectedHeadlines.length} Headlines
+                  Continue with {selectedHeadlines.length} Headlines
                 </button>
               </div>
             )}

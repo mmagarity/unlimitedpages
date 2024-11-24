@@ -1,148 +1,194 @@
 import type { GeneratedArticle } from '../types';
 import { useWebflowStore } from '../store/webflowStore';
+import { ContentValidator } from '../utils/contentValidation';
+
+interface WebflowConfig {
+  apiUrl: string;
+  apiKey: string;
+  siteId: string;
+  collectionId: string;
+}
+
+interface ContentItem {
+  id: string;
+  fields: {
+    name: string;
+    slug: string;
+    'post-body': string;
+    'post-summary': string;
+    'meta-title': string;
+    'meta-description': string;
+    'publish-date': string;
+    'author': string;
+    '_archived': boolean;
+    '_draft': boolean;
+  };
+}
+
+interface PublishResult {
+  success: boolean;
+  itemId: string;
+  error?: string;
+}
+
+class RateLimiter {
+  private tokens: number;
+  private lastRefill: number;
+  private maxTokens: number;
+  private tokenRefillRate: number;
+
+  constructor({ maxRequests, perMinute }: { maxRequests: number; perMinute: number }) {
+    this.maxTokens = maxRequests;
+    this.tokens = maxRequests;
+    this.lastRefill = Date.now();
+    this.tokenRefillRate = (perMinute * 60 * 1000) / maxRequests;
+  }
+
+  async waitForToken(): Promise<void> {
+    this.refillTokens();
+    
+    if (this.tokens <= 0) {
+      const waitTime = this.tokenRefillRate - (Date.now() - this.lastRefill);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+      this.refillTokens();
+    }
+    
+    this.tokens--;
+  }
+
+  private refillTokens(): void {
+    const now = Date.now();
+    const timePassed = now - this.lastRefill;
+    const newTokens = Math.floor(timePassed / this.tokenRefillRate);
+    
+    if (newTokens > 0) {
+      this.tokens = Math.min(this.maxTokens, this.tokens + newTokens);
+      this.lastRefill = now;
+    }
+  }
+}
 
 export class WebflowService {
-  private static async getConfig() {
-    const store = useWebflowStore.getState();
-    const config = store.config;
-    
-    if (!config) {
-      throw new Error('Webflow not configured');
-    }
-    
-    return config;
+  private static instance: WebflowService;
+  private config: WebflowConfig;
+  private rateLimiter: RateLimiter;
+
+  private constructor() {
+    this.rateLimiter = new RateLimiter({
+      maxRequests: 60,
+      perMinute: 1
+    });
   }
 
-  static async validateCredentials(config: {
-    apiKey: string;
-    siteId: string;
-    collectionId: string;
-  }) {
+  public static getInstance(): WebflowService {
+    if (!WebflowService.instance) {
+      WebflowService.instance = new WebflowService();
+    }
+    return WebflowService.instance;
+  }
+
+  public async setConfig(config: WebflowConfig) {
+    this.config = config;
+    // Validate config
+    await this.validateCredentials();
+  }
+
+  private async validateCredentials(): Promise<boolean> {
     try {
-      // First validate the API key and site ID
-      const siteResponse = await fetch('https://api.webflow.com/sites', {
+      const response = await fetch(`${this.config.apiUrl}/sites`, {
         headers: {
-          'Authorization': `Bearer ${config.apiKey}`,
-          'accept-version': '1.0.0'
+          'Authorization': `Bearer ${this.config.apiKey}`,
+          'accept-version': '2.0.0'
         }
       });
-
-      if (!siteResponse.ok) {
-        throw new Error(`Invalid API key or permissions: ${siteResponse.statusText}`);
-      }
-
-      const sites = await siteResponse.json();
-      const siteExists = sites.some((site: any) => site.id === config.siteId);
-      
-      if (!siteExists) {
-        throw new Error('Site ID not found in your Webflow account');
-      }
-
-      // Then validate the collection ID
-      const collectionResponse = await fetch(`https://api.webflow.com/sites/${config.siteId}/collections`, {
-        headers: {
-          'Authorization': `Bearer ${config.apiKey}`,
-          'accept-version': '1.0.0'
-        }
-      });
-
-      if (!collectionResponse.ok) {
-        throw new Error(`Failed to fetch collections: ${collectionResponse.statusText}`);
-      }
-
-      const collections = await collectionResponse.json();
-      const collectionExists = collections.some((collection: any) => collection.id === config.collectionId);
-
-      if (!collectionExists) {
-        throw new Error('Collection ID not found in the specified site');
-      }
-
-      return true;
+      return response.ok;
     } catch (error) {
-      console.error('Webflow validation error:', error);
-      throw error;
+      console.error('Failed to validate Webflow credentials:', error);
+      throw new Error('Invalid Webflow credentials');
     }
   }
 
-  static async publishContent(article: GeneratedArticle) {
-    const config = await this.getConfig();
-    
-    try {
-      // First create the item
-      const createResponse = await fetch(`https://api.webflow.com/collections/${config.collectionId}/items`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${config.apiKey}`,
-          'accept-version': '1.0.0',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          fields: {
-            name: article.content.title,
-            slug: this.generateSlug(article.content.title),
-            'post-body': article.content.mainContent,
-            'post-summary': article.content.introduction,
-            'meta-title': article.seo.metaTitle,
-            'meta-description': article.seo.metaDescription,
-            'publish-date': new Date().toISOString(),
-            'author': 'AI Content Generator',
-            '_archived': false,
-            '_draft': false
-          }
-        })
-      });
-
-      if (!createResponse.ok) {
-        const errorData = await createResponse.json();
-        throw new Error(`Failed to create item in Webflow: ${errorData.msg || createResponse.statusText}`);
-      }
-
-      const createdItem = await createResponse.json();
-
-      // Then publish the item
-      const publishResponse = await fetch(`https://api.webflow.com/collections/${config.collectionId}/items/${createdItem._id}/publish`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${config.apiKey}`,
-          'accept-version': '1.0.0'
-        }
-      });
-
-      if (!publishResponse.ok) {
-        throw new Error('Failed to publish the created item');
-      }
-
-      return createdItem;
-    } catch (error) {
-      console.error('Webflow publish error:', error);
-      throw error;
+  public async publishContent(article: GeneratedArticle): Promise<PublishResult> {
+    // Validate content before publishing
+    const validationResult = ContentValidator.validateArticle(article);
+    if (!validationResult.isValid) {
+      return {
+        success: false,
+        itemId: article.id,
+        error: `Content validation failed: ${validationResult.errors.join(', ')}`
+      };
     }
-  }
 
-  static async getPublishedArticles() {
-    const config = await this.getConfig();
+    const contentItem: ContentItem = {
+      id: article.id,
+      fields: {
+        name: article.content.title,
+        slug: this.generateSlug(article.content.title),
+        'post-body': article.content.mainContent,
+        'post-summary': article.content.introduction,
+        'meta-title': article.seo.metaTitle,
+        'meta-description': article.seo.metaDescription,
+        'publish-date': new Date().toISOString(),
+        'author': 'AI Content Generator',
+        '_archived': false,
+        '_draft': false
+      }
+    };
+
+    await this.rateLimiter.waitForToken();
     
     try {
-      const response = await fetch(`https://api.webflow.com/collections/${config.collectionId}/items?limit=100`, {
-        headers: {
-          'Authorization': `Bearer ${config.apiKey}`,
-          'accept-version': '1.0.0'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch published articles');
-      }
-
-      const data = await response.json();
-      return data.items;
+      const result = await this.publishSingleItem(contentItem);
+      return result;
     } catch (error) {
-      console.error('Failed to fetch Webflow articles:', error);
-      throw error;
+      console.error(`Failed to publish item ${contentItem.id}:`, error);
+      return {
+        success: false,
+        itemId: contentItem.id,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
     }
   }
 
-  private static generateSlug(title: string): string {
+  private async publishSingleItem(item: ContentItem): Promise<PublishResult> {
+    // Add retry logic
+    let attempts = 0;
+    const maxAttempts = 3;
+
+    while (attempts < maxAttempts) {
+      try {
+        const response = await fetch(`${this.config.apiUrl}/collections/${this.config.collectionId}/items`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.config.apiKey}`,
+            'accept-version': '2.0.0',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(item)
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        return {
+          success: true,
+          itemId: item.id
+        };
+      } catch (error) {
+        attempts++;
+        if (attempts === maxAttempts) {
+          throw error;
+        }
+        // Exponential backoff
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempts) * 1000));
+      }
+    }
+
+    throw new Error('Max retry attempts reached');
+  }
+
+  private generateSlug(title: string): string {
     return title
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')

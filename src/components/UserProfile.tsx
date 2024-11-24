@@ -54,6 +54,13 @@ export function UserProfile({ user, onSignOut }: UserProfileProps) {
 
           <div className="py-1">
             <button
+              onClick={() => handleNavigation('/settings/account')}
+              className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+            >
+              <Settings className="w-4 h-4 mr-3 text-gray-400" />
+              Account Settings
+            </button>
+            <button
               onClick={() => handleNavigation('/settings/webflow')}
               className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
             >
@@ -66,13 +73,6 @@ export function UserProfile({ user, onSignOut }: UserProfileProps) {
             >
               <BarChart className="w-4 h-4 mr-3 text-gray-400" />
               Usage & Billing
-            </button>
-            <button
-              onClick={() => handleNavigation('/settings/account')}
-              className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-            >
-              <Settings className="w-4 h-4 mr-3 text-gray-400" />
-              Settings
             </button>
             <div className="border-t my-1"></div>
             <button

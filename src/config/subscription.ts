@@ -1,27 +1,24 @@
 export const SUBSCRIPTION_TIERS = {
-  basic: {
-    id: 'basic',
-    name: 'Basic Plan',
+  pro: {
+    name: 'Pro Plan',
     price: 60,
-    interval: 'month',
-    stripePriceId: 'price_XXXXX', // Replace with actual Stripe price ID
+    payment_link: 'https://buy.stripe.com/fZe00KbK3e7gfUQdQR',
+    features: [
+      '10,000 articles per month',
+      'Unlimited variations',
+      'Priority support',
+      'API access',
+      'Custom metadata',
+      'Export functionality'
+    ],
     limits: {
       monthlyArticles: 10000,
-      baseArticles: 30,
-      cityVariations: 1000,
-      imagesPerArticle: 3,
-      totalImages: 90
-    },
-    features: [
-      'Generate up to 10,000 articles per month',
-      'Scale Across 1,000 of the most populated US Cities',
-      'Add Relevant Images for Every Article',
-      'Unlimited Demographic Variations',
-      'Webflow CMS Integration',
-      'Schedule Automated Publishing'
-    ]
+      baseArticles: 100
+    }
   }
 } as const;
+
+export type SubscriptionTier = keyof typeof SUBSCRIPTION_TIERS;
 
 export const API_COSTS = {
   perplexity: {

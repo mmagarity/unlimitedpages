@@ -1,44 +1,38 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Link, useNavigate } from 'react-router-dom';
 
-/**
- * SignIn Component
- * Handles user authentication with email and password
- * Features:
- * - Email/password form validation
- * - Error handling with notifications
- * - Links to sign up and password reset
- * - Loading state management
- */
-export const SignIn: React.FC = () => {
-  // Form state management
-  const [email, setEmail] = useState('');
+export const ChangeEmail: React.FC = () => {
+  const [newEmail, setNewEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   
-  // Hooks
-  const { signIn } = useAuth();
-  const navigate = useNavigate();
+  const { changeEmail } = useAuth();
 
-  /**
-   * Handle form submission
-   * Attempts to sign in the user and shows appropriate feedback
-   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccess(false);
     
+    if (!newEmail.trim() || !password.trim()) {
+      setError('Please fill in all fields');
+      return;
+    }
+    
     try {
       setLoading(true);
-      await signIn(email, password);
-      console.log('Sign in successful, redirecting to payment');
-      navigate('/payment', { replace: true });
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to sign in');
+      const { error } = await changeEmail(newEmail, password);
+      
+      if (error) {
+        setError(error.message);
+      } else {
+        setSuccess(true);
+        setNewEmail('');
+        setPassword('');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to change email');
     } finally {
       setLoading(false);
     }
@@ -47,10 +41,11 @@ export const SignIn: React.FC = () => {
   return (
     <div className="container mx-auto px-4 py-10">
       <div className="max-w-md mx-auto bg-white p-8 rounded-lg shadow-lg border border-gray-200">
+        <h2 className="text-2xl font-bold mb-6 text-center">Change Email</h2>
+        
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Error Message */}
           {error && (
-            <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
+            <div className="bg-red-50 border-l-4 border-red-400 p-4">
               <div className="flex">
                 <div className="flex-shrink-0">
                   <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -64,9 +59,8 @@ export const SignIn: React.FC = () => {
             </div>
           )}
 
-          {/* Success Message */}
           {success && (
-            <div className="bg-green-50 border-l-4 border-green-400 p-4 mb-4">
+            <div className="bg-green-50 border-l-4 border-green-400 p-4">
               <div className="flex">
                 <div className="flex-shrink-0">
                   <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
@@ -74,31 +68,30 @@ export const SignIn: React.FC = () => {
                   </svg>
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm text-green-700">Successfully signed in!</p>
+                  <p className="text-sm text-green-700">Email changed successfully! Please check your new email for verification.</p>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Email Input */}
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-              Email
+            <label htmlFor="newEmail" className="block text-sm font-medium text-gray-700 mb-1">
+              New Email Address
             </label>
             <input
-              id="email"
+              id="newEmail"
               type="email"
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Enter new email address"
             />
           </div>
-          
-          {/* Password Input */}
+
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-              Password
+              Current Password
             </label>
             <input
               id="password"
@@ -107,10 +100,10 @@ export const SignIn: React.FC = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Enter your current password"
             />
           </div>
-          
-          {/* Submit Button */}
+
           <button
             type="submit"
             disabled={loading}
@@ -118,27 +111,8 @@ export const SignIn: React.FC = () => {
               loading ? 'opacity-50 cursor-not-allowed' : ''
             }`}
           >
-            {loading ? (
-              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-            ) : null}
-            Sign In
+            {loading ? 'Changing...' : 'Change Email'}
           </button>
-          
-          {/* Navigation Links */}
-          <div className="text-sm text-center space-y-2">
-            <p>
-              Don't have an account?{' '}
-              <Link to="/signup" className="text-blue-600 hover:text-blue-500">
-                Sign Up
-              </Link>
-            </p>
-            <Link to="/reset-password" className="block text-blue-600 hover:text-blue-500">
-              Forgot Password?
-            </Link>
-          </div>
         </form>
       </div>
     </div>

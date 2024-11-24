@@ -1,11 +1,19 @@
-import { LucideIcon } from 'lucide-react';
+import type { Icon } from 'lucide-react';
 
-export type IconType = typeof LucideIcon;
+export type IconType = typeof Icon;
 
 export interface WorkflowStep {
   title: string;
   description: string;
   completed: boolean;
+}
+
+export interface ArticleType {
+  id: string;
+  name: string;
+  description: string;
+  icon: IconType;
+  examples: string[];
 }
 
 export interface HeadlineTemplate {
@@ -33,11 +41,16 @@ export interface HeadlineVariation {
 }
 
 export interface ContentVariation {
+  id: string;
   type: 'location' | 'demographic' | 'year';
   value: string;
   preposition?: string;
-  format?: string;
-  cityCount?: number;
+  metadata?: {
+    city?: string;
+    state?: string;
+    stateName?: string;
+    population?: number;
+  };
 }
 
 export interface CMSField {
@@ -45,4 +58,40 @@ export interface CMSField {
   name: string;
   type: string;
   required: boolean;
+}
+
+export interface GeneratedArticle {
+  id: string;
+  title: string;
+  content: string;
+  seo: {
+    metaTitle: string;
+    metaDescription: string;
+    focusKeywords?: string[];
+    slug?: string;
+    canonicalUrl?: string;
+    ogTitle?: string;
+    ogDescription?: string;
+  };
+  schema: {
+    '@context': string;
+    '@type': string;
+    data: {
+      headline: string;
+      description?: string;
+      articleType?: string;
+      datePublished?: string;
+      dateModified?: string;
+      keywords?: string[];
+    };
+  };
+  variation: string;
+  metadata?: {
+    city?: string;
+    state?: string;
+    stateName?: string;
+    population?: number;
+    year?: number;
+    demographic?: string;
+  };
 }

@@ -1,31 +1,14 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
-/**
- * ResetPassword Component
- * Handles password reset functionality
- * Features:
- * - Email validation
- * - Password reset request through Supabase
- * - Error handling with notifications
- * - Loading state management
- */
-export const ResetPassword: React.FC = () => {
-  // Form state management
+export const MagicLink: React.FC = () => {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   
-  // Hooks
-  const { resetPassword, signInWithMagicLink } = useAuth();
+  const { signInWithMagicLink } = useAuth();
 
-  /**
-   * Handle form submission
-   * Sends password reset email through Supabase
-   * Shows success/error feedback to user
-   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -38,33 +21,16 @@ export const ResetPassword: React.FC = () => {
     
     try {
       setLoading(true);
-      try {
-        await resetPassword(email);
-      } catch (resetErr) {
-        console.log('Password reset failed, trying magic link:', resetErr);
-        // If password reset fails, try magic link
-        const { error: magicLinkError } = await signInWithMagicLink(email);
-        if (magicLinkError) throw magicLinkError;
-      }
-      setSuccess(true);
-      setEmail(''); // Clear email after successful request
-    } catch (err) {
-      console.error('Reset password error:', err);
-      if (err instanceof Error) {
-        // Handle specific error messages
-        if (err.message.includes('No account found')) {
-          setError('No account found with this email address.');
-        } else if (err.message.includes('rate limit')) {
-          setError('Too many attempts. Please try again later.');
-        } else if (err.message.includes('configuration')) {
-          setError('A magic link has been sent to your email. Please check your inbox.');
-          setSuccess(true);
-        } else {
-          setError(err.message);
-        }
+      const { error } = await signInWithMagicLink(email);
+      
+      if (error) {
+        setError(error.message);
       } else {
-        setError('Failed to reset password. Please try again later.');
+        setSuccess(true);
+        setEmail('');
       }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
     }
@@ -73,10 +39,11 @@ export const ResetPassword: React.FC = () => {
   return (
     <div className="container mx-auto px-4 py-10">
       <div className="max-w-md mx-auto bg-white p-8 rounded-lg shadow-lg border border-gray-200">
+        <h2 className="text-2xl font-bold mb-6 text-center">Sign In with Magic Link</h2>
+        
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Error Message */}
           {error && (
-            <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
+            <div className="bg-red-50 border-l-4 border-red-400 p-4">
               <div className="flex">
                 <div className="flex-shrink-0">
                   <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -90,9 +57,8 @@ export const ResetPassword: React.FC = () => {
             </div>
           )}
 
-          {/* Success Message */}
           {success && (
-            <div className="bg-green-50 border-l-4 border-green-400 p-4 mb-4">
+            <div className="bg-green-50 border-l-4 border-green-400 p-4">
               <div className="flex">
                 <div className="flex-shrink-0">
                   <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
@@ -100,13 +66,12 @@ export const ResetPassword: React.FC = () => {
                   </svg>
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm text-green-700">Check your email for password reset instructions.</p>
+                  <p className="text-sm text-green-700">Check your email for the magic link!</p>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Email Input */}
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
               Email
@@ -118,10 +83,10 @@ export const ResetPassword: React.FC = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Enter your email"
             />
           </div>
-          
-          {/* Submit Button */}
+
           <button
             type="submit"
             disabled={loading}
@@ -129,21 +94,8 @@ export const ResetPassword: React.FC = () => {
               loading ? 'opacity-50 cursor-not-allowed' : ''
             }`}
           >
-            {loading ? (
-              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-            ) : null}
-            Reset Password
+            {loading ? 'Sending...' : 'Send Magic Link'}
           </button>
-          
-          {/* Navigation Links */}
-          <div className="text-sm text-center">
-            <Link to="/signin" className="text-blue-600 hover:text-blue-500">
-              Back to Sign In
-            </Link>
-          </div>
         </form>
       </div>
     </div>

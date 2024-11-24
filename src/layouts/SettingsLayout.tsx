@@ -1,11 +1,12 @@
 import React from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Globe, BarChart, Settings as SettingsIcon, Box, ArrowLeft } from 'lucide-react';
+import { Globe, BarChart, Settings as SettingsIcon, Box, ArrowLeft, FileDown } from 'lucide-react';
 
 const navItems = [
+  { to: '/settings/account', icon: SettingsIcon, label: 'Account Settings' },
   { to: '/settings/webflow', icon: Globe, label: 'Webflow Integration' },
   { to: '/settings/usage', icon: BarChart, label: 'Usage & Billing' },
-  { to: '/settings/account', icon: SettingsIcon, label: 'Account Settings' }
+  { to: '/settings/exports', icon: FileDown, label: 'Export History' }
 ];
 
 export function SettingsLayout() {

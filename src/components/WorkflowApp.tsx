@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Box } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { useAuthFlow } from '../hooks/useAuthFlow';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { useWorkflowStore } from '../store/workflowStore';
 import { WorkflowStepper } from './WorkflowStepper';
 import { ArticleTypeSelector } from './ArticleTypeSelector';
@@ -13,8 +13,43 @@ import { PublishingOptions } from './PublishingOptions';
 import { UserProfile } from './UserProfile';
 import type { ArticleType, HeadlineVariation, ContentVariation } from '../types';
 
+const WORKFLOW_STEPS = [
+  {
+    title: 'Select Type',
+    description: 'Choose article type',
+    completed: false
+  },
+  {
+    title: 'Headlines',
+    description: 'Generate headlines',
+    completed: false
+  },
+  {
+    title: 'Variations',
+    description: 'Select variations',
+    completed: false
+  },
+  {
+    title: 'Preview',
+    description: 'Review content',
+    completed: false
+  },
+  {
+    title: 'CMS Mapping',
+    description: 'Map to CMS fields',
+    completed: false
+  },
+  {
+    title: 'Publish',
+    description: 'Publish content',
+    completed: false
+  }
+];
+
 export function WorkflowApp() {
-  const { requiresAuth, requiresPayment } = useAuthFlow();
+  console.log('🔄 WorkflowApp rendering');
+  const navigate = useNavigate();
+  const { user, loading, signOut } = useAuth();
   const { 
     currentStep, 
     completedSteps,
@@ -31,18 +66,32 @@ export function WorkflowApp() {
     restoreWorkflowState 
   } = useWorkflowStore();
 
+  // Update steps completion status
+  const steps = WORKFLOW_STEPS.map((step, index) => ({
+    ...step,
+    completed: completedSteps.includes(index)
+  }));
+
   useEffect(() => {
+    console.log('👤 Current user:', user?.email);
+    console.log('🔄 Current step:', currentStep);
+    console.log('✅ Completed steps:', completedSteps);
+    
     // Restore workflow state when returning from auth/payment
     restoreWorkflowState();
-  }, []);
+  }, [user, loading]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   const handleArticleTypeSelected = (type: ArticleType) => {
-    setSelectedTypes(prev => {
-      if (!prev.find(t => t.id === type.id)) {
-        return [...prev, type];
-      }
-      return prev;
-    });
+    console.log('Selected article type:', type);
+    setSelectedTypes([type]); // Always set as array with single type
     markStepCompleted(0);
     setCurrentStep(1);
   };
@@ -93,112 +142,82 @@ export function WorkflowApp() {
             </div>
             <span className="text-xl font-bold text-gray-900">UnlimitedPages</span>
           </Link>
-          <UserProfile 
-            user={{
-              name: 'Demo User',
-              email: 'demo@example.com'
-            }}
-            onSignOut={() => {}}
-          />
+          <div className="flex items-center gap-4">
+            {user ? (
+              <UserProfile 
+                user={user}
+                onSignOut={async () => {
+                  try {
+                    await signOut();
+                    navigate('/signin');
+                  } catch (error) {
+                    console.error('Error signing out:', error);
+                  }
+                }}
+              />
+            ) : (
+              <Link
+                to="/signin"
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+              >
+                Sign In
+              </Link>
+            )}
+          </div>
         </div>
+      </div>
 
-        {/* Workflow Steps */}
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <WorkflowStepper 
-          steps={[
-            {
-              title: 'Select Type',
-              description: 'Choose article type',
-              completed: completedSteps.includes(0)
-            },
-            {
-              title: 'Headlines',
-              description: 'Generate headlines',
-              completed: completedSteps.includes(1)
-            },
-            {
-              title: 'Variations',
-              description: 'Select variations',
-              completed: completedSteps.includes(2)
-            },
-            {
-              title: 'Preview',
-              description: 'Review content',
-              completed: completedSteps.includes(3)
-            },
-            {
-              title: 'CMS Mapping',
-              description: 'Map to CMS fields',
-              completed: completedSteps.includes(4)
-            },
-            {
-              title: 'Publish',
-              description: 'Publish content',
-              completed: completedSteps.includes(5)
-            }
-          ]}
+          steps={steps}
           currentStep={currentStep}
           onStepClick={setCurrentStep}
         />
-
-        {/* Main Content */}
-        <div className="py-8">
+        
+        <div className="mt-8">
           {currentStep === 0 && (
-            <ArticleTypeSelector 
+            <ArticleTypeSelector
               onTypeSelected={handleArticleTypeSelected}
               selectedTypes={selectedTypes}
               selectedHeadlines={selectedHeadlines}
             />
           )}
-
-          {currentStep === 1 && (
+          
+          {currentStep === 1 && selectedTypes.length > 0 && (
             <HeadlineGenerator
-              selectedTemplates={selectedTypes.flatMap(type => type.templates)}
               onHeadlinesGenerated={handleHeadlinesSelected}
               selectedHeadlines={selectedHeadlines}
-              onAddMoreTypes={() => setCurrentStep(0)}
-              currentArticleType={selectedTypes[0]?.id}
-              onHeadlineAdded={(headline) => setSelectedHeadlines([...selectedHeadlines, headline])}
-              onHeadlineRemoved={(id) => setSelectedHeadlines(selectedHeadlines.filter(h => h.id !== id))}
             />
           )}
-
-          {currentStep === 2 && (
+          
+          {currentStep === 2 && selectedHeadlines.length > 0 && (
             <VariationSelector
               selectedHeadlines={selectedHeadlines}
               onVariationsSelected={handleVariationsSelected}
             />
           )}
-
-          {currentStep === 3 && (
+          
+          {currentStep === 3 && selectedVariations.length > 0 && (
             <ContentPreview
               headlines={selectedHeadlines}
               variations={selectedVariations}
               onComplete={handleContentPreviewComplete}
             />
           )}
-
-          {/* Only show CMS and Publish steps if authenticated and paid */}
-          {!requiresAuth && !requiresPayment && (
-            <>
-              {currentStep === 4 && (
-                <CMSMappingTable 
-                  selectedHeadlines={selectedHeadlines}
-                  selectedVariations={selectedVariations}
-                  onExport={handleCMSMappingComplete}
-                  onPublish={() => setCurrentStep(5)}
-                />
-              )}
-
-              {currentStep === 5 && (
-                <PublishingOptions
-                  articles={generatedContent}
-                  onNavigateToSettings={handleNavigateToSettings}
-                  onPublish={() => {
-                    // Handle publish completion
-                  }}
-                />
-              )}
-            </>
+          
+          {currentStep === 4 && generatedContent && (
+            <CMSMappingTable
+              content={generatedContent}
+              onComplete={handleCMSMappingComplete}
+            />
+          )}
+          
+          {currentStep === 5 && (
+            <PublishingOptions
+              content={generatedContent}
+              onNavigateToSettings={handleNavigateToSettings}
+            />
           )}
         </div>
       </div>

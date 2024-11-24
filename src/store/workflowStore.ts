@@ -10,6 +10,7 @@ interface WorkflowState {
   selectedVariations: ContentVariation[];
   previewData: any | null;
   totalArticles: number;
+  generatedContent: any[] | null;
   saveWorkflowState: () => void;
   restoreWorkflowState: () => void;
   setCurrentStep: (step: number) => void;
@@ -17,8 +18,9 @@ interface WorkflowState {
   setSelectedHeadlines: (headlines: HeadlineVariation[]) => void;
   setSelectedVariations: (variations: ContentVariation[]) => void;
   setPreviewData: (data: any) => void;
+  setGeneratedContent: (content: any[]) => void;
   markStepCompleted: (step: number) => void;
-  calculateTotalArticles: () => void;
+  calculateTotalArticles: (total: number) => void;
   reset: () => void;
 }
 
@@ -32,21 +34,65 @@ export const useWorkflowStore = create<WorkflowState>()(
       selectedVariations: [],
       previewData: null,
       totalArticles: 0,
+      generatedContent: null,
 
       saveWorkflowState: () => {
         // State is automatically persisted by zustand/persist
       },
 
       restoreWorkflowState: () => {
-        // State is automatically restored by zustand/persist
+        const state = get();
+        // Only restore if we have a valid previous state
+        if (state.selectedTypes.length > 0 || state.selectedHeadlines.length > 0) {
+          console.log('Restoring workflow state:', state);
+          return;
+        }
+        // Otherwise reset to initial state
+        set({
+          currentStep: 0,
+          completedSteps: [],
+          selectedTypes: [],
+          selectedHeadlines: [],
+          selectedVariations: [],
+          previewData: null,
+          totalArticles: 0,
+          generatedContent: null
+        });
       },
 
-      setCurrentStep: (step) => 
-        set((state) => ({ 
-          currentStep: step,
-          // When moving backwards, keep completed steps
-          completedSteps: state.completedSteps.filter(s => s < step)
-        })),
+      setCurrentStep: (step: number) => {
+        set((state) => {
+          // If going back to a previous step, remove it and subsequent steps from completed
+          const completedSteps = state.completedSteps.filter(s => s < step);
+          
+          // Reset data for subsequent steps
+          let updates: Partial<WorkflowState> = {
+            currentStep: step,
+            completedSteps
+          };
+          
+          if (step === 0) {
+            // Going back to article type selection
+            updates = {
+              ...updates,
+              selectedHeadlines: [],
+              selectedVariations: [],
+              previewData: null,
+              generatedContent: null
+            };
+          } else if (step === 1) {
+            // Going back to headlines
+            updates = {
+              ...updates,
+              selectedVariations: [],
+              previewData: null,
+              generatedContent: null
+            };
+          }
+          
+          return updates;
+        });
+      },
 
       markStepCompleted: (step) =>
         set((state) => ({
@@ -54,43 +100,35 @@ export const useWorkflowStore = create<WorkflowState>()(
             .sort((a, b) => a - b)
         })),
 
-      setSelectedTypes: (types) =>
+      setSelectedTypes: (types: ArticleType[]) => 
         set((state) => {
-          if (types.length > 0) {
-            return {
-              selectedTypes: types,
-              completedSteps: [...new Set([...state.completedSteps, 0])]
-                .sort((a, b) => a - b)
-            };
-          }
-          return { selectedTypes: types };
+          const newTypes = Array.isArray(types) ? types : [types];
+          return {
+            selectedTypes: newTypes,
+            // When setting types, ensure we're on step 1 and it's marked as completed
+            currentStep: 1,
+            completedSteps: [...new Set([...state.completedSteps, 0])]
+              .sort((a, b) => a - b)
+          };
         }),
 
-      setSelectedHeadlines: (headlines) =>
-        set((state) => {
-          if (headlines.length > 0) {
-            return {
-              selectedHeadlines: headlines,
-              completedSteps: [...new Set([...state.completedSteps, 1])]
-                .sort((a, b) => a - b)
-            };
-          }
-          return { selectedHeadlines: headlines };
-        }),
+      setSelectedHeadlines: (headlines: HeadlineVariation[]) => 
+        set((state) => ({
+          selectedHeadlines: headlines,
+          completedSteps: headlines.length > 0 
+            ? [...new Set([...state.completedSteps, 1])].sort((a, b) => a - b)
+            : state.completedSteps.filter(step => step !== 1)
+        })),
 
-      setSelectedVariations: (variations) =>
-        set((state) => {
-          if (variations.length > 0) {
-            return {
-              selectedVariations: variations,
-              completedSteps: [...new Set([...state.completedSteps, 2])]
-                .sort((a, b) => a - b)
-            };
-          }
-          return { selectedVariations: variations };
-        }),
+      setSelectedVariations: (variations: ContentVariation[]) => 
+        set((state) => ({
+          selectedVariations: variations,
+          completedSteps: variations.length > 0
+            ? [...new Set([...state.completedSteps, 2])].sort((a, b) => a - b)
+            : state.completedSteps.filter(step => step !== 2)
+        })),
 
-      setPreviewData: (data) =>
+      setPreviewData: (data: any) =>
         set((state) => {
           if (data !== null) {
             return {
@@ -102,12 +140,19 @@ export const useWorkflowStore = create<WorkflowState>()(
           return { previewData: data };
         }),
 
-      calculateTotalArticles: () => {
-        const { selectedHeadlines, selectedVariations } = get();
-        const total = selectedHeadlines.length * selectedVariations.length;
-        set({ totalArticles: total });
-      },
-      
+      setGeneratedContent: (content: any[]) =>
+        set((state) => ({
+          generatedContent: content,
+          completedSteps: content.length > 0
+            ? [...new Set([...state.completedSteps, 3])].sort((a, b) => a - b)
+            : state.completedSteps.filter(step => step !== 3)
+        })),
+
+      calculateTotalArticles: (total: number) => 
+        set(() => ({
+          totalArticles: total
+        })),
+
       reset: () => set({
         currentStep: 0,
         completedSteps: [],
@@ -115,7 +160,8 @@ export const useWorkflowStore = create<WorkflowState>()(
         selectedHeadlines: [],
         selectedVariations: [],
         previewData: null,
-        totalArticles: 0
+        totalArticles: 0,
+        generatedContent: null
       })
     }),
     {
@@ -126,6 +172,7 @@ export const useWorkflowStore = create<WorkflowState>()(
         selectedVariations: state.selectedVariations,
         previewData: state.previewData,
         totalArticles: state.totalArticles,
+        generatedContent: state.generatedContent,
         completedSteps: state.completedSteps
       })
     }
