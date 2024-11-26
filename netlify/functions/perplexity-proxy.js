@@ -30,29 +30,58 @@ export const handler = async function(event, context) {
   }
 
   try {
-    const body = JSON.parse(event.body);
-    const apiKey = process.env.VITE_PERPLEXITY_API_KEY;
-
-    if (!apiKey) {
-      console.error('Missing Perplexity API key in environment');
-      throw new Error('Perplexity API key not configured');
-    }
-
-    if (!body.messages || !Array.isArray(body.messages)) {
+    // Parse and validate request body
+    let body;
+    try {
+      body = JSON.parse(event.body);
+      console.log('Parsed request body:', JSON.stringify(body, null, 2));
+    } catch (parseError) {
+      console.error('Failed to parse request body:', parseError);
       return {
         statusCode: 400,
         headers: {
           ...corsHeaders,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
+          error: 'Invalid request body',
+          details: parseError.message
+        })
+      };
+    }
+
+    // Validate API key
+    const apiKey = process.env.VITE_PERPLEXITY_API_KEY;
+    if (!apiKey) {
+      console.error('Missing Perplexity API key in environment');
+      return {
+        statusCode: 500,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          error: 'Configuration Error',
+          message: 'API key not configured'
+        })
+      };
+    }
+
+    // Validate request structure
+    if (!body.messages || !Array.isArray(body.messages)) {
+      console.error('Invalid request structure:', body);
+      return {
+        statusCode: 400,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
           error: 'Invalid request',
           message: 'Request must include messages array'
         })
       };
     }
-
-    console.log('Request body:', JSON.stringify(body, null, 2));
 
     // Create the request options
     const options = {
@@ -77,23 +106,24 @@ export const handler = async function(event, context) {
         res.on('end', () => {
           try {
             console.log('Raw response data:', data);
+            
             if (!data) {
+              console.error('Empty response from Perplexity API');
               reject(new Error('Empty response from API'));
               return;
             }
-            
+
             let parsedData;
             try {
               parsedData = JSON.parse(data);
+              console.log('Parsed API response:', JSON.stringify(parsedData, null, 2));
             } catch (parseError) {
-              console.error('JSON Parse Error:', parseError);
+              console.error('Failed to parse API response:', parseError);
               console.error('Raw data causing parse error:', data);
               reject(new Error('Failed to parse API response'));
               return;
             }
 
-            console.log('API Response:', JSON.stringify(parsedData, null, 2));
-            
             // Handle API error responses
             if (parsedData.error) {
               console.error('API Error:', parsedData.error);
@@ -110,6 +140,8 @@ export const handler = async function(event, context) {
 
             // Extract and validate the content
             const content = parsedData.choices[0].message.content;
+            console.log('Extracted content:', content);
+
             if (typeof content !== 'string') {
               console.error('Invalid content type:', typeof content);
               reject(new Error('Invalid content type in API response'));
@@ -125,13 +157,13 @@ export const handler = async function(event, context) {
                   throw new Error('Parsed content is not an object');
                 }
                 finalContent = contentObj.content || contentObj;
+                console.log('Parsed content as JSON:', finalContent);
               } catch (contentParseError) {
-                // If parsing fails, use the original content string
-                console.log('Content JSON parse failed, using raw content:', contentParseError);
+                console.error('Content JSON parse failed:', contentParseError);
                 console.error('Raw content that failed to parse:', content);
               }
             }
-            
+
             resolve({
               statusCode: 200,
               headers: {
@@ -141,9 +173,8 @@ export const handler = async function(event, context) {
               body: JSON.stringify({ content: finalContent })
             });
           } catch (error) {
-            console.error('Error parsing API response:', error);
-            console.error('Raw data that failed to parse:', data);
-            reject(new Error('Invalid response from API'));
+            console.error('Error in response processing:', error);
+            reject(new Error('Failed to process API response'));
           }
         });
       });
@@ -155,13 +186,21 @@ export const handler = async function(event, context) {
 
       // Add request timeout
       req.setTimeout(30000, () => {
+        console.error('Request timeout');
         req.destroy();
         reject(new Error('Request timeout'));
       });
 
-      // Write request body
-      req.write(JSON.stringify(body));
-      req.end();
+      // Write request body and handle potential errors
+      try {
+        const requestBody = JSON.stringify(body);
+        console.log('Sending request body:', requestBody);
+        req.write(requestBody);
+        req.end();
+      } catch (error) {
+        console.error('Error writing request body:', error);
+        reject(new Error('Failed to send request body'));
+      }
     });
 
     return response;
@@ -174,7 +213,7 @@ export const handler = async function(event, context) {
         ...corsHeaders,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         error: 'API Error',
         message: error.message,
         details: process.env.NODE_ENV === 'development' ? error.stack : undefined
