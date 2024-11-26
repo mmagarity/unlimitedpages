@@ -176,9 +176,20 @@ export const handler = async function(event, context) {
       }
     };
 
+    log('Request options: ' + JSON.stringify({
+      ...options,
+      headers: {
+        ...options.headers,
+        'Authorization': 'Bearer ' + apiKey.substring(0, 8) + '...'
+      }
+    }, null, 2));
+
     // Make the request using a Promise wrapper
     const response = await new Promise((resolve, reject) => {
       const req = https.request(options, (res) => {
+        log(`Response status: ${res.statusCode}`);
+        log(`Response headers: ${JSON.stringify(res.headers, null, 2)}`);
+        
         let data = '';
 
         res.on('data', (chunk) => {
