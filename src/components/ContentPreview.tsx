@@ -142,14 +142,14 @@ export function ContentPreview({ headlines, variations, onComplete }: ContentPre
 
   const generateSlug = (headline: string, variation: ContentVariation) => {
     const title = generateVariationTitle(headline, variation);
-    return title
+    return String(title)
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
   };
 
   const generateMetaDescription = (headline: string, variation: ContentVariation) => {
-    return `Discover ${headline.toLowerCase()} ${variation.preposition} ${variation.value}. Expert insights and comprehensive guide updated for 2024.`;
+    return `Discover ${String(headline).toLowerCase()} ${variation.preposition} ${variation.value}. Expert insights and comprehensive guide updated for 2024.`;
   };
 
   // Calculate total number of variations
