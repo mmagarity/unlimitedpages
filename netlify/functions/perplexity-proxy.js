@@ -121,10 +121,14 @@ export const handler = async function(event, context) {
             if (content.trim().startsWith('{') && content.trim().endsWith('}')) {
               try {
                 const contentObj = JSON.parse(content);
+                if (typeof contentObj !== 'object' || !contentObj) {
+                  throw new Error('Parsed content is not an object');
+                }
                 finalContent = contentObj.content || contentObj;
               } catch (contentParseError) {
                 // If parsing fails, use the original content string
                 console.log('Content JSON parse failed, using raw content:', contentParseError);
+                console.error('Raw content that failed to parse:', content);
               }
             }
             
