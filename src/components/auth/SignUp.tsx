@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
+import { ROUTES } from '../../config/constants';
 
 /**
  * SignUp Component
@@ -90,13 +91,7 @@ export const SignUp: React.FC = () => {
 
       setSuccess(true);
       
-      if (confirmationRequired) {
-        setEmailSent(true);
-        console.log('Confirmation email required, waiting for user to verify');
-      } else {
-        console.log('No confirmation required, redirecting to payment');
-        navigate('/payment', { replace: true });
-      }
+      navigate(ROUTES.PAYMENT);
     } catch (error) {
       console.error('Unexpected error during sign up:', error);
       setError(error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.');
@@ -126,7 +121,7 @@ export const SignUp: React.FC = () => {
           )}
 
           {/* Success Message */}
-          {success && emailSent && (
+          {success && (
             <div className="bg-green-50 border-l-4 border-green-400 p-4 mb-4">
               <div className="flex">
                 <div className="flex-shrink-0">
@@ -136,7 +131,7 @@ export const SignUp: React.FC = () => {
                 </div>
                 <div className="ml-3">
                   <p className="text-sm text-green-700">
-                    Success! Please check your email for a confirmation link to complete your registration.
+                    Success! Your account has been created.
                   </p>
                 </div>
               </div>

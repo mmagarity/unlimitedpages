@@ -30,8 +30,10 @@
    - Copy Signing Secret (`VITE_STRIPE_WEBHOOK_SECRET`)
 
 ### 3. Perplexity Setup
-1. Get API key from [perplexity.ai](https://perplexity.ai)
-2. Copy API key (`VITE_PERPLEXITY_API_KEY`)
+1. Get your API key from [Perplexity AI](https://www.perplexity.ai/)
+2. Configure the API key in your environment:
+   - Key: `VITE_PERPLEXITY_API_KEY`
+   - Value: Your Perplexity API key
 
 ### 4. Environment Setup
 1. Copy `.env.example` to `.env`:

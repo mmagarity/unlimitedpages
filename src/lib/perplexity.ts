@@ -1,5 +1,3 @@
-import { API_CONFIG } from '../config/api';
-
 // Update API endpoint to use Netlify function
 const PERPLEXITY_ENDPOINT = '/.netlify/functions/perplexity-proxy';
 
@@ -79,7 +77,7 @@ interface LocationData {
 
 const LOCATION_SENSITIVE_TYPES = ['coffee_shops', 'restaurants', 'bars', 'gyms', 'hotels', 'activities', 'attractions'];
 
-async function isLocationSensitive(articleType: string, headline: string): Promise<boolean> {
+export async function isLocationSensitive(articleType: string, headline: string): Promise<boolean> {
   // Check if the article type is inherently location-sensitive
   if (LOCATION_SENSITIVE_TYPES.includes(articleType)) return true;
   
@@ -88,7 +86,7 @@ async function isLocationSensitive(articleType: string, headline: string): Promi
   return locationKeywords.some(keyword => headline.toLowerCase().includes(keyword));
 }
 
-async function generateLocationSpecificContent(
+export async function generateLocationSpecificContent(
   headline: string, 
   articleType: string, 
   location: LocationData
@@ -220,23 +218,36 @@ Required Format (return as JSON):
       throw new Error('Invalid response format from API');
     }
 
-    const content = data.choices?.[0]?.message?.content;
-    console.log('Content from response:', content);
-    
-    if (!content || typeof content !== 'string') {
+    let content;
+    if (data.choices && data.choices[0] && data.choices[0].message) {
+      try {
+        content = JSON.parse(data.choices[0].message.content);
+      } catch (error) {
+        console.error('Failed to parse content:', error);
+        console.error('Content that failed to parse:', data.choices[0].message.content);
+        throw new Error('Failed to parse content from API response');
+      }
+    } else if (data.content) {
+      content = data.content;
+    } else {
+      console.error('Invalid response structure:', data);
+      throw new Error('Invalid response structure from API');
+    }
+
+    // Validate the content structure
+    if (!content || typeof content !== 'object') {
       console.error('Invalid content format:', content);
       throw new Error('Invalid content format in API response');
     }
 
-    try {
-      const parsedContent = JSON.parse(content);
-      console.log('Parsed content:', parsedContent);
-      return parsedContent;
-    } catch (error) {
-      console.error('Failed to parse content:', error);
-      console.error('Content that failed to parse:', content);
-      throw new Error('Failed to parse API response content');
+    // Validate required fields
+    if (!content.title || !content.sections || !content.seo || !content.schema) {
+      console.error('Missing required fields in content:', content);
+      throw new Error('Missing required fields in content');
     }
+
+    // Return the response
+    return { content } as PerplexityResponse;
   } catch (error) {
     console.error('Error generating content with Perplexity:', error);
     if (process.env.NODE_ENV === 'development') {
@@ -307,8 +318,14 @@ interface DynamicVariables {
   };
 }
 
+interface LocationContext {
+  city?: string;
+  state?: string;
+  location?: string;
+}
+
 // Utility to check if content needs location-specific generation
-function needsLocationSpecificContent(content: string, location: DynamicVariables['location']): boolean {
+function needsLocationSpecificContent(content: string): boolean {
   const locationTerms = [
     'local regulations',
     'state laws',
@@ -335,18 +352,17 @@ export async function generateVariation(
   // Check if we need location-specific content generation
   const needsLocationContent = location && (
     forceNewGeneration || 
-    needsLocationSpecificContent(JSON.stringify(baseContent), location)
+    needsLocationSpecificContent(JSON.stringify(baseContent))
   );
 
-  if (needsLocationContent) {
+  if (needsLocationContent && location) {
     // Generate new content with location-specific information
     return generateWithPerplexity(
       newContent.content.title,
       newContent.content.schema.data.articleType,
       {
         city: location.city,
-        state: location.state,
-        country: location.country || 'United States'
+        state: location.state
       }
     );
   }
@@ -498,12 +514,6 @@ function generateCanonicalUrl(baseUrl: string, variables: DynamicVariables): str
   return `${baseUrl}${slug ? `/${slug}` : ''}`;
 }
 
-interface LocationContext {
-  city?: string;
-  state?: string;
-  location?: string;
-}
-
 export async function generateWithPerplexity(
   headline: string,
   type: string = 'general',
@@ -602,27 +612,39 @@ Format the response as a JSON object with the following structure:
     console.log('Raw API response:', data);
 
     if (!data || typeof data !== 'object') {
-      console.error('Invalid response data:', data);
       throw new Error('Invalid response format from API');
     }
 
-    const content = data.choices?.[0]?.message?.content;
-    console.log('Content from response:', content);
-    
-    if (!content || typeof content !== 'string') {
+    let content;
+    if (data.choices && data.choices[0] && data.choices[0].message) {
+      try {
+        content = JSON.parse(data.choices[0].message.content);
+      } catch (error) {
+        console.error('Failed to parse content:', error);
+        console.error('Content that failed to parse:', data.choices[0].message.content);
+        throw new Error('Failed to parse content from API response');
+      }
+    } else if (data.content) {
+      content = data.content;
+    } else {
+      console.error('Invalid response structure:', data);
+      throw new Error('Invalid response structure from API');
+    }
+
+    // Validate the content structure
+    if (!content || typeof content !== 'object') {
       console.error('Invalid content format:', content);
       throw new Error('Invalid content format in API response');
     }
 
-    try {
-      const parsedContent = JSON.parse(content);
-      console.log('Parsed content:', parsedContent);
-      return parsedContent;
-    } catch (error) {
-      console.error('Failed to parse content:', error);
-      console.error('Content that failed to parse:', content);
-      throw new Error('Failed to parse API response content');
+    // Validate required fields
+    if (!content.title || !content.sections || !content.seo || !content.schema) {
+      console.error('Missing required fields in content:', content);
+      throw new Error('Missing required fields in content');
     }
+
+    // Return the response
+    return { content } as PerplexityResponse;
   } catch (error) {
     console.error('Error generating content with Perplexity:', error);
     if (process.env.NODE_ENV === 'development') {
@@ -637,65 +659,34 @@ Format the response as a JSON object with the following structure:
 function mockPerplexityResponse(headline: string): PerplexityResponse {
   return {
     content: {
-      title: `Mock Article: ${headline}`,
+      title: `[Mock Data] ${headline}`,
       sections: {
-        introduction: "This is a mock introduction paragraph...",
+        introduction: `[Mock Data] Welcome to our comprehensive guide about ${headline}. This AI-generated content provides an overview of key concepts and insights.`,
         mainContent: [
-          "This is the first main content section...",
-          "This is the second main content section..."
+          `[Mock Data] Section 1: Understanding ${headline}\nThis AI-generated section explores the fundamental aspects and key considerations of ${headline}.`,
+          `[Mock Data] Section 2: Key Benefits and Features\nThis AI-generated section outlines the main advantages and notable characteristics of ${headline}.`,
+          `[Mock Data] Section 3: Best Practices\nThis AI-generated section provides expert recommendations and proven strategies for ${headline}.`
         ],
-        conclusion: "This is the mock conclusion paragraph..."
+        conclusion: `[Mock Data] This AI-generated conclusion summarizes the key points about ${headline} and provides next steps for readers.`
       },
-      images: [
-        {
-          url: "https://via.placeholder.com/800x400?text=Introduction+Image",
-          alt: "Introduction section image",
-          caption: "A compelling introduction image",
-          placement: "introduction"
-        },
-        {
-          url: "https://via.placeholder.com/800x400?text=Middle+Image",
-          alt: "Middle section image",
-          caption: "An engaging middle section image",
-          placement: "middle"
-        },
-        {
-          url: "https://via.placeholder.com/800x400?text=Conclusion+Image",
-          alt: "Conclusion section image",
-          caption: "A powerful conclusion image",
-          placement: "conclusion"
-        }
-      ],
-      citations: [
-        {
-          url: "https://example.com/source1",
-          title: "Mock Source 1",
-          source: "example.com"
-        },
-        {
-          url: "https://example.com/source2",
-          title: "Mock Source 2",
-          source: "example.com"
-        }
-      ],
       seo: {
-        metaTitle: `Mock SEO Title: ${headline}`,
-        metaDescription: "This is a mock meta description...",
-        focusKeywords: ["mock", "test", "example"],
-        slug: "mock-article-slug",
-        canonicalUrl: "/guides/mock-article-slug",
-        ogTitle: `Mock Social Title: ${headline}`,
-        ogDescription: "This is a mock social description..."
+        metaTitle: `[Mock Data] ${headline} | Comprehensive Guide ${new Date().getFullYear()}`,
+        metaDescription: `[Mock Data] Discover everything about ${headline}. This AI-generated guide provides expert insights and recommendations updated for ${new Date().getFullYear()}.`,
+        focusKeywords: [`[Mock Data] ${headline}`, 'guide', 'expert insights', 'recommendations'],
+        slug: headline.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        canonicalUrl: `/guides/${headline.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+        ogTitle: `[Mock Data] ${headline} | Expert Guide ${new Date().getFullYear()}`,
+        ogDescription: `[Mock Data] Comprehensive AI-generated guide about ${headline}`
       },
       schema: {
-        type: "Article",
+        type: 'Article',
         data: {
-          "@context": "https://schema.org",
-          "@type": "Article",
-          headline: headline,
-          description: "Mock article description",
-          articleType: "general",
-          keywords: ["mock", "test", "example"],
+          '@context': 'https://schema.org',
+          '@type': 'Article',
+          headline: `[Mock Data] ${headline}`,
+          description: `[Mock Data] Comprehensive AI-generated guide about ${headline}`,
+          articleType: 'general',
+          keywords: [`[Mock Data] ${headline}`, 'guide', 'expert insights', 'recommendations'],
           datePublished: new Date().toISOString(),
           dateModified: new Date().toISOString()
         }

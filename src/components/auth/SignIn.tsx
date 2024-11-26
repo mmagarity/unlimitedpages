@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
+import { useSubscription } from '../../hooks/useSubscription';
+import { ROUTES } from '../../config/constants';
 
 /**
  * SignIn Component
@@ -34,10 +37,27 @@ export const SignIn: React.FC = () => {
     
     try {
       setLoading(true);
-      await signIn(email, password);
-      console.log('Sign in successful, redirecting to payment');
-      navigate('/payment', { replace: true });
+      const { user, error: signInError } = await signIn(email, password);
+      
+      if (signInError) {
+        throw signInError;
+      }
+
+      if (!user) {
+        throw new Error('No user returned from sign in');
+      }
+
+      // Check subscription status
+      const { subscription } = useSubscription(user.id);
+      
+      // Redirect based on subscription status
+      if (subscription) {
+        navigate(ROUTES.APP);
+      } else {
+        navigate(ROUTES.PAYMENT);
+      }
     } catch (error) {
+      console.error('Sign in error:', error);
       setError(error instanceof Error ? error.message : 'Failed to sign in');
     } finally {
       setLoading(false);

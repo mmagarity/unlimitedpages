@@ -3,6 +3,7 @@ import { Box } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useWorkflowStore } from '../store/workflowStore';
+import { useSubscription } from '../hooks/useSubscription';
 import { WorkflowStepper } from './WorkflowStepper';
 import { ArticleTypeSelector } from './ArticleTypeSelector';
 import { HeadlineGenerator } from './HeadlineGenerator';
@@ -12,6 +13,7 @@ import { CMSMappingTable } from './CMSMappingTable';
 import { PublishingOptions } from './PublishingOptions';
 import { UserProfile } from './UserProfile';
 import type { ArticleType, HeadlineVariation, ContentVariation } from '../types';
+import { ROUTES } from '../config/constants';
 
 const WORKFLOW_STEPS = [
   {
@@ -50,6 +52,7 @@ export function WorkflowApp() {
   console.log('🔄 WorkflowApp rendering');
   const navigate = useNavigate();
   const { user, loading, signOut } = useAuth();
+  const { subscription, isLoading } = useSubscription(user?.id || '');
   const { 
     currentStep, 
     completedSteps,
@@ -66,20 +69,47 @@ export function WorkflowApp() {
     restoreWorkflowState 
   } = useWorkflowStore();
 
-  // Update steps completion status
-  const steps = WORKFLOW_STEPS.map((step, index) => ({
-    ...step,
-    completed: completedSteps.includes(index)
-  }));
-
   useEffect(() => {
+    // If not logged in, redirect to sign in
+    if (!user) {
+      navigate(ROUTES.SIGNIN);
+      return;
+    }
+
+    // If loading subscription data, show loading state
+    if (isLoading) return;
+
+    // If no subscription, redirect to payment
+    if (!subscription) {
+      navigate(ROUTES.PAYMENT);
+      return;
+    }
+
     console.log('👤 Current user:', user?.email);
     console.log('🔄 Current step:', currentStep);
     console.log('✅ Completed steps:', completedSteps);
     
     // Restore workflow state when returning from auth/payment
     restoreWorkflowState();
-  }, [user, loading]);
+  }, [user, subscription, isLoading, navigate, loading]);
+
+  if (!user) return null;
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md">
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+            Loading...
+          </h2>
+          <p className="mt-2 text-center text-sm text-gray-600">
+            Please wait while we check your subscription.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!subscription) return null;
 
   if (loading) {
     return (
@@ -88,6 +118,12 @@ export function WorkflowApp() {
       </div>
     );
   }
+
+  // Update steps completion status
+  const steps = WORKFLOW_STEPS.map((step, index) => ({
+    ...step,
+    completed: completedSteps.includes(index)
+  }));
 
   const handleArticleTypeSelected = (type: ArticleType) => {
     console.log('Selected article type:', type);

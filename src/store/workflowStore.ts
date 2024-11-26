@@ -73,9 +73,9 @@ export const useWorkflowStore = create<WorkflowState>()(
           
           if (step === 0) {
             // Going back to article type selection
+            // Keep selectedHeadlines but reset other data
             updates = {
               ...updates,
-              selectedHeadlines: [],
               selectedVariations: [],
               previewData: null,
               generatedContent: null
@@ -102,13 +102,16 @@ export const useWorkflowStore = create<WorkflowState>()(
 
       setSelectedTypes: (types: ArticleType[]) => 
         set((state) => {
-          const newTypes = Array.isArray(types) ? types : [types];
+          // If types have changed, clear headlines
+          const typesChanged = JSON.stringify(types) !== JSON.stringify(state.selectedTypes);
           return {
-            selectedTypes: newTypes,
-            // When setting types, ensure we're on step 1 and it's marked as completed
-            currentStep: 1,
-            completedSteps: [...new Set([...state.completedSteps, 0])]
-              .sort((a, b) => a - b)
+            selectedTypes: types,
+            // Clear headlines if types changed
+            selectedHeadlines: typesChanged ? [] : state.selectedHeadlines,
+            // Always clear subsequent steps
+            selectedVariations: [],
+            previewData: null,
+            generatedContent: null
           };
         }),
 

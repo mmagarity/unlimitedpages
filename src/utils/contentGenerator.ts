@@ -53,36 +53,58 @@ ${content.sections.conclusion}
 
 function generateFallbackContent(headline: string) {
   return {
-    title: headline,
-    metaDescription: `Discover ${headline.toLowerCase()}. Expert insights and recommendations updated for 2024.`,
-    introduction: `Looking for ${headline.toLowerCase()}? Our comprehensive guide provides expert insights and recommendations.`,
+    title: `[Mock Data] ${headline}`,
+    metaDescription: `[Mock Data] Discover ${headline.toLowerCase()}. AI-generated insights and recommendations updated for ${new Date().getFullYear()}.`,
+    introduction: `[Mock Data] Looking for information about ${headline.toLowerCase()}? This AI-generated guide provides expert insights and recommendations.`,
     sections: [
-      'Overview',
-      'Key Features',
-      'Expert Recommendations',
-      'Conclusion'
+      '[Mock Data] Overview - AI-generated content',
+      '[Mock Data] Key Features - AI-generated content',
+      '[Mock Data] Expert Recommendations - AI-generated content',
+      '[Mock Data] Conclusion - AI-generated content'
     ],
     cmsFields: {
-      title: headline,
+      title: `[Mock Data] ${headline}`,
       slug: headline.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-      metaTitle: `${headline} | Expert Guide 2024`,
-      metaDescription: `Discover ${headline.toLowerCase()}. Expert insights and recommendations updated for 2024.`,
+      metaTitle: `[Mock Data] ${headline} | AI-Generated Guide ${new Date().getFullYear()}`,
+      metaDescription: `[Mock Data] Discover ${headline.toLowerCase()}. AI-generated insights and recommendations updated for ${new Date().getFullYear()}.`,
       canonicalUrl: `/guides/${headline.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
-      mainContent: `## Introduction\n\nFallback content for ${headline}`,
+      mainContent: `## [Mock Data] Introduction
+
+This is an AI-generated guide about ${headline.toLowerCase()}.
+
+## [Mock Data] Overview
+
+AI-generated overview content.
+
+## [Mock Data] Key Features
+
+AI-generated features content.
+
+## [Mock Data] Expert Recommendations
+
+AI-generated recommendations content.
+
+## [Mock Data] Conclusion
+
+AI-generated conclusion content.`,
       images: [
         {
           url: `https://source.unsplash.com/1200x800/?${encodeURIComponent(headline)}`,
-          alt: `${headline} - Primary Image`,
-          caption: `Exploring ${headline}`
+          alt: `[Mock Data] ${headline} - AI-Generated Content`,
+          caption: `[Mock Data] AI-generated image for ${headline}`
         }
       ],
       schema: {
         '@context': 'https://schema.org',
         '@type': 'Article',
-        headline: headline,
-        description: `Discover ${headline.toLowerCase()}. Expert insights and recommendations updated for 2024.`,
+        headline: `[Mock Data] ${headline}`,
+        description: `[Mock Data] AI-generated guide about ${headline.toLowerCase()}.`,
         datePublished: new Date().toISOString(),
-        dateModified: new Date().toISOString()
+        dateModified: new Date().toISOString(),
+        author: {
+          '@type': 'Organization',
+          name: '[Mock Data] AI Content Generator'
+        }
       }
     }
   };

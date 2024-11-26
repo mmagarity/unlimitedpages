@@ -60,7 +60,16 @@ function App() {
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/magic-link" element={<MagicLink />} />
             <Route path="/confirm" element={<ConfirmSignUp />} />
-            <Route path="/app" element={<WorkflowApp />} />
+            
+            {/* Protected App Route */}
+            <Route
+              path="/app"
+              element={
+                <ProtectedRoute>
+                  <WorkflowApp />
+                </ProtectedRoute>
+              }
+            />
             
             {/* Protected Routes */}
             <Route

@@ -1,11 +1,31 @@
-const https = require('https');
+import https from 'https';
 
-exports.handler = async function(event, context) {
+export const handler = async function(event, context) {
+  // Add CORS headers to all responses
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS'
+  };
+
+  // Handle OPTIONS request for CORS
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: ''
+    };
+  }
+
   // Only allow POST requests
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
-      body: 'Method Not Allowed'
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ error: 'Method Not Allowed' })
     };
   }
 
@@ -14,8 +34,22 @@ exports.handler = async function(event, context) {
     const apiKey = process.env.VITE_PERPLEXITY_API_KEY;
 
     if (!apiKey) {
-      console.error('Missing API key in environment');
-      throw new Error('API key not configured');
+      console.error('Missing Perplexity API key in environment');
+      throw new Error('Perplexity API key not configured');
+    }
+
+    if (!body.messages || !Array.isArray(body.messages)) {
+      return {
+        statusCode: 400,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          error: 'Invalid request',
+          message: 'Request must include messages array'
+        })
+      };
     }
 
     console.log('Request body:', JSON.stringify(body, null, 2));
@@ -42,69 +76,78 @@ exports.handler = async function(event, context) {
 
         res.on('end', () => {
           try {
+            console.log('Raw response data:', data);
+            if (!data) {
+              reject(new Error('Empty response from API'));
+              return;
+            }
+            
             const parsedData = JSON.parse(data);
             console.log('API Response:', JSON.stringify(parsedData, null, 2));
             
+            // Handle API error responses
+            if (parsedData.error) {
+              console.error('API Error:', parsedData.error);
+              reject(new Error(parsedData.error.message || 'API Error'));
+              return;
+            }
+
+            // Validate response structure
+            if (!parsedData.choices?.[0]?.message?.content) {
+              console.error('Invalid API response format:', parsedData);
+              reject(new Error('Invalid API response format'));
+              return;
+            }
+
+            // Extract the content from the message
+            const content = parsedData.choices[0].message.content;
+            
             resolve({
-              statusCode: res.statusCode,
-              statusMessage: res.statusMessage,
-              headers: res.headers,
-              data: parsedData
+              statusCode: 200,
+              headers: {
+                ...corsHeaders,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ content })
             });
           } catch (error) {
-            console.error('Failed to parse API response:', error);
-            console.log('Raw response:', data);
-            reject(new Error('Invalid JSON response from API'));
+            console.error('Error parsing API response:', error);
+            console.error('Raw data that failed to parse:', data);
+            reject(new Error('Invalid response from API'));
           }
         });
       });
 
       req.on('error', (error) => {
         console.error('Request error:', error);
-        reject(error);
+        reject(new Error('Failed to connect to Perplexity API'));
       });
 
-      // Write request body and handle errors
-      try {
-        req.write(JSON.stringify(body));
-        req.end();
-      } catch (error) {
-        console.error('Error writing request:', error);
-        reject(error);
-      }
+      // Add request timeout
+      req.setTimeout(30000, () => {
+        req.destroy();
+        reject(new Error('Request timeout'));
+      });
+
+      // Write request body
+      req.write(JSON.stringify(body));
+      req.end();
     });
 
-    // Handle non-200 responses
-    if (response.statusCode !== 200) {
-      console.error('API error response:', {
-        statusCode: response.statusCode,
-        statusMessage: response.statusMessage,
-        data: response.data
-      });
-      throw new Error(`API error: ${response.statusCode} ${response.statusMessage}`);
-    }
+    return response;
 
-    return {
-      statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS'
-      },
-      body: JSON.stringify(response.data)
-    };
   } catch (error) {
-    console.error('Proxy error:', error);
+    console.error('Function error:', error);
     return {
-      statusCode: 500,
+      statusCode: error.statusCode || 500,
       headers: {
-        'Access-Control-Allow-Origin': '*'
+        ...corsHeaders,
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({ 
-        error: error.message,
-        details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
-        timestamp: new Date().toISOString()
+        error: 'API Error',
+        message: error.message,
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
       })
     };
   }

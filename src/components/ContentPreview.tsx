@@ -5,6 +5,7 @@ import { generatePreviewContent } from '../utils/contentGenerator';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { BatchGenerationProgress } from './BatchGenerationProgress';
 
 interface ContentPreviewProps {
   headlines: HeadlineVariation[];
@@ -20,6 +21,8 @@ export function ContentPreview({ headlines, variations, onComplete }: ContentPre
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
+  const [progress, setProgress] = useState({ completed: 0, total: 0 });
+  const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState(0);
 
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -53,6 +56,10 @@ export function ContentPreview({ headlines, variations, onComplete }: ContentPre
     }
 
     setIsGenerating(true);
+    const totalArticles = headlines.length * variations.length;
+    setProgress({ completed: 0, total: totalArticles });
+    setEstimatedTimeRemaining(totalArticles * 30); // Estimate 30 seconds per article
+    
     try {
       // Check subscription status
       const { data: profiles, error: profileError } = await supabase
@@ -93,6 +100,7 @@ export function ContentPreview({ headlines, variations, onComplete }: ContentPre
       console.error('Error generating content:', error);
     } finally {
       setIsGenerating(false);
+      setProgress({ completed: 0, total: 0 });
     }
   };
 
@@ -200,7 +208,14 @@ export function ContentPreview({ headlines, variations, onComplete }: ContentPre
   );
 
   return (
-    <div className="w-full max-w-6xl mx-auto">
+    <div className="w-full max-w-4xl mx-auto p-4">
+      {isGenerating && (
+        <BatchGenerationProgress
+          total={progress.total}
+          completed={progress.completed}
+          estimatedTimeRemaining={estimatedTimeRemaining}
+        />
+      )}
       <div className="bg-white shadow rounded-lg">
         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
           <div>
