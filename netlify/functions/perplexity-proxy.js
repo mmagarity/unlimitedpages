@@ -1,4 +1,29 @@
 import https from 'https';
+import fs from 'fs';
+import path from 'path';
+
+// Add logging function
+const log = (message, type = 'info') => {
+  const timestamp = new Date().toISOString();
+  const logMessage = `${timestamp} [${type.toUpperCase()}] ${message}\n`;
+  
+  // Log to console
+  console.log(logMessage);
+  
+  // In development, also log to file
+  if (process.env.NODE_ENV === 'development') {
+    const logDir = path.join(__dirname, '../../logs');
+    const logFile = path.join(logDir, 'perplexity-proxy.log');
+    
+    // Create logs directory if it doesn't exist
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+    }
+    
+    // Append to log file
+    fs.appendFileSync(logFile, logMessage);
+  }
+};
 
 export const handler = async function(event, context) {
   // Add CORS headers to all responses
@@ -34,9 +59,32 @@ export const handler = async function(event, context) {
     let body;
     try {
       body = JSON.parse(event.body);
-      console.log('Parsed request body:', JSON.stringify(body, null, 2));
+      // Format the topic properly if it's an object
+      if (body.messages && Array.isArray(body.messages)) {
+        body.messages = body.messages.map(msg => {
+          if (msg.content && msg.content.includes('Topic: [object Object]')) {
+            // Extract the actual topic from the request
+            const topicMatch = msg.content.match(/Topic:\s*(.+?)\n/);
+            if (topicMatch) {
+              const topic = topicMatch[1];
+              try {
+                const parsedTopic = JSON.parse(topic);
+                msg.content = msg.content.replace(
+                  /Topic:\s*.+?\n/,
+                  `Topic: ${parsedTopic.baseHeadline || topic}\n`
+                );
+              } catch (e) {
+                // If parsing fails, leave as is
+                console.log('Failed to parse topic:', e);
+              }
+            }
+          }
+          return msg;
+        });
+      }
+      log('Parsed and formatted request body: ' + JSON.stringify(body, null, 2));
     } catch (parseError) {
-      console.error('Failed to parse request body:', parseError);
+      log('Failed to parse request body: ' + parseError, 'error');
       return {
         statusCode: 400,
         headers: {
@@ -53,7 +101,7 @@ export const handler = async function(event, context) {
     // Validate API key
     const apiKey = process.env.VITE_PERPLEXITY_API_KEY;
     if (!apiKey) {
-      console.error('Missing Perplexity API key in environment');
+      log('Missing Perplexity API key in environment', 'error');
       return {
         statusCode: 500,
         headers: {
@@ -69,7 +117,7 @@ export const handler = async function(event, context) {
 
     // Validate request structure
     if (!body.messages || !Array.isArray(body.messages)) {
-      console.error('Invalid request structure:', body);
+      log('Invalid request structure: ' + JSON.stringify(body), 'error');
       return {
         statusCode: 400,
         headers: {
@@ -90,7 +138,8 @@ export const handler = async function(event, context) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        'Authorization': `Bearer ${apiKey}`,
+        'Accept': 'application/json'
       }
     };
 
@@ -105,10 +154,17 @@ export const handler = async function(event, context) {
 
         res.on('end', () => {
           try {
-            console.log('Raw response data:', data);
+            log('Raw response data: ' + data);
             
+            // Check for non-200 status code
+            if (res.statusCode !== 200) {
+              log(`API returned status ${res.statusCode}: ${data}`, 'error');
+              reject(new Error(`API returned status ${res.statusCode}: ${data}`));
+              return;
+            }
+
             if (!data) {
-              console.error('Empty response from Perplexity API');
+              log('Empty response from Perplexity API', 'error');
               reject(new Error('Empty response from API'));
               return;
             }
@@ -116,34 +172,34 @@ export const handler = async function(event, context) {
             let parsedData;
             try {
               parsedData = JSON.parse(data);
-              console.log('Parsed API response:', JSON.stringify(parsedData, null, 2));
+              log('Parsed API response: ' + JSON.stringify(parsedData, null, 2));
             } catch (parseError) {
-              console.error('Failed to parse API response:', parseError);
-              console.error('Raw data causing parse error:', data);
+              log('Failed to parse API response: ' + parseError, 'error');
+              log('Raw data causing parse error: ' + data, 'error');
               reject(new Error('Failed to parse API response'));
               return;
             }
 
             // Handle API error responses
             if (parsedData.error) {
-              console.error('API Error:', parsedData.error);
+              log('API Error: ' + JSON.stringify(parsedData.error), 'error');
               reject(new Error(parsedData.error.message || 'API Error'));
               return;
             }
 
             // Validate response structure
             if (!parsedData.choices?.[0]?.message?.content) {
-              console.error('Invalid API response format:', parsedData);
+              log('Invalid API response format: ' + JSON.stringify(parsedData), 'error');
               reject(new Error('Invalid API response format'));
               return;
             }
 
             // Extract and validate the content
             const content = parsedData.choices[0].message.content;
-            console.log('Extracted content:', content);
+            log('Extracted content: ' + content);
 
             if (typeof content !== 'string') {
-              console.error('Invalid content type:', typeof content);
+              log('Invalid content type: ' + typeof content, 'error');
               reject(new Error('Invalid content type in API response'));
               return;
             }
@@ -157,10 +213,10 @@ export const handler = async function(event, context) {
                   throw new Error('Parsed content is not an object');
                 }
                 finalContent = contentObj.content || contentObj;
-                console.log('Parsed content as JSON:', finalContent);
+                log('Parsed content as JSON: ' + JSON.stringify(finalContent, null, 2));
               } catch (contentParseError) {
-                console.error('Content JSON parse failed:', contentParseError);
-                console.error('Raw content that failed to parse:', content);
+                log('Content JSON parse failed: ' + contentParseError, 'error');
+                log('Raw content that failed to parse: ' + content, 'error');
               }
             }
 
@@ -173,20 +229,20 @@ export const handler = async function(event, context) {
               body: JSON.stringify({ content: finalContent })
             });
           } catch (error) {
-            console.error('Error in response processing:', error);
+            log('Error in response processing: ' + error, 'error');
             reject(new Error('Failed to process API response'));
           }
         });
       });
 
       req.on('error', (error) => {
-        console.error('Request error:', error);
+        log('Request error: ' + error, 'error');
         reject(new Error('Failed to connect to Perplexity API'));
       });
 
       // Add request timeout
       req.setTimeout(30000, () => {
-        console.error('Request timeout');
+        log('Request timeout', 'error');
         req.destroy();
         reject(new Error('Request timeout'));
       });
@@ -194,11 +250,11 @@ export const handler = async function(event, context) {
       // Write request body and handle potential errors
       try {
         const requestBody = JSON.stringify(body);
-        console.log('Sending request body:', requestBody);
+        log('Sending request body: ' + requestBody);
         req.write(requestBody);
         req.end();
       } catch (error) {
-        console.error('Error writing request body:', error);
+        log('Error writing request body: ' + error, 'error');
         reject(new Error('Failed to send request body'));
       }
     });
@@ -206,7 +262,7 @@ export const handler = async function(event, context) {
     return response;
 
   } catch (error) {
-    console.error('Function error:', error);
+    log('Function error: ' + error, 'error');
     return {
       statusCode: error.statusCode || 500,
       headers: {
