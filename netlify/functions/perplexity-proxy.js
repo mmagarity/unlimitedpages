@@ -130,6 +130,8 @@ export const handler = async function(event, context) {
       };
     }
 
+    log('Using API key: ' + apiKey.substring(0, 8) + '...');
+
     // Validate request structure
     if (!body.messages || !Array.isArray(body.messages)) {
       log('Invalid request structure: ' + JSON.stringify(body), 'error');
