@@ -130,6 +130,21 @@ export const handler = async function(event, context) {
       };
     }
 
+    if (!apiKey.startsWith('pplx-')) {
+      log('Invalid API key format', 'error');
+      return {
+        statusCode: 500,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          error: 'Configuration Error',
+          message: 'Invalid API key format'
+        })
+      };
+    }
+
     log('Using API key: ' + apiKey.substring(0, 8) + '...');
 
     // Validate request structure
@@ -156,7 +171,8 @@ export const handler = async function(event, context) {
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        'Authorization': `Bearer ${apiKey}`,
+        'User-Agent': 'UnlimitedPages/1.0'
       }
     };
 
