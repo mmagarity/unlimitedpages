@@ -82,7 +82,16 @@ export const handler = async function(event, context) {
               return;
             }
             
-            const parsedData = JSON.parse(data);
+            let parsedData;
+            try {
+              parsedData = JSON.parse(data);
+            } catch (parseError) {
+              console.error('JSON Parse Error:', parseError);
+              console.error('Raw data causing parse error:', data);
+              reject(new Error('Failed to parse API response'));
+              return;
+            }
+
             console.log('API Response:', JSON.stringify(parsedData, null, 2));
             
             // Handle API error responses
@@ -99,8 +108,25 @@ export const handler = async function(event, context) {
               return;
             }
 
-            // Extract the content from the message
+            // Extract and validate the content
             const content = parsedData.choices[0].message.content;
+            if (typeof content !== 'string') {
+              console.error('Invalid content type:', typeof content);
+              reject(new Error('Invalid content type in API response'));
+              return;
+            }
+
+            // Try to parse the content as JSON if it looks like JSON
+            let finalContent = content;
+            if (content.trim().startsWith('{') && content.trim().endsWith('}')) {
+              try {
+                const contentObj = JSON.parse(content);
+                finalContent = contentObj.content || contentObj;
+              } catch (contentParseError) {
+                // If parsing fails, use the original content string
+                console.log('Content JSON parse failed, using raw content:', contentParseError);
+              }
+            }
             
             resolve({
               statusCode: 200,
@@ -108,7 +134,7 @@ export const handler = async function(event, context) {
                 ...corsHeaders,
                 'Content-Type': 'application/json'
               },
-              body: JSON.stringify({ content })
+              body: JSON.stringify({ content: finalContent })
             });
           } catch (error) {
             console.error('Error parsing API response:', error);
