@@ -1,11 +1,11 @@
-import { generateContentWithClaude } from './claudeApi';
+import { generateContentWithPerplexity } from './perplexityApi';
 import { generateSlug } from './slugUtils';
 import { formatCityState } from '../data/locationData';
-import type { CMSFields, ContentParams } from '../types';
+import type { CMSFields, ContentParams, GeneratedContent } from '../types';
 
 export async function generateCMSFields(params: ContentParams): Promise<CMSFields> {
-  // Generate content using Claude API
-  const content = await generateContentWithClaude(params);
+  // Generate content using Perplexity API
+  const content = await generateContentWithPerplexity(params);
   
   // Generate slug and URLs
   const slug = generateSlug({

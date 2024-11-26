@@ -59,23 +59,38 @@ export const handler = async function(event, context) {
     let body;
     try {
       body = JSON.parse(event.body);
+      
+      // Ensure we're using Perplexity's model and parameters
+      body.model = "llama-3.1-sonar-small-128k-online"; // Use Perplexity's model
+      body.temperature = body.temperature || 0.2;
+      body.top_p = body.top_p || 0.9;
+      body.frequency_penalty = 1;
+      body.stream = false;
+      
       // Format the topic properly if it's an object
       if (body.messages && Array.isArray(body.messages)) {
         body.messages = body.messages.map(msg => {
-          if (msg.content && msg.content.includes('Topic: [object Object]')) {
-            // Extract the actual topic from the request
-            const topicMatch = msg.content.match(/Topic:\s*(.+?)\n/);
+          if (msg.content && typeof msg.content === 'string') {
+            // Extract the topic from the content
+            const topicMatch = msg.content.match(/Topic:\s*(\[.*?\]|\{.*?\})/s);
             if (topicMatch) {
-              const topic = topicMatch[1];
               try {
-                const parsedTopic = JSON.parse(topic);
+                // Handle array of objects
+                const topicStr = topicMatch[1].replace(/\[object Object\]/g, '{}');
+                const topics = JSON.parse(topicStr);
+                // Get the first non-empty topic's headline
+                const headline = Array.isArray(topics) 
+                  ? topics.find(t => t && t.baseHeadline)?.baseHeadline || 'Unknown Topic'
+                  : topics.baseHeadline || 'Unknown Topic';
+                
                 msg.content = msg.content.replace(
-                  /Topic:\s*.+?\n/,
-                  `Topic: ${parsedTopic.baseHeadline || topic}\n`
+                  /Topic:\s*(\[.*?\]|\{.*?\})/s,
+                  `Topic: ${headline}`
                 );
               } catch (e) {
-                // If parsing fails, leave as is
                 console.log('Failed to parse topic:', e);
+                // If parsing fails, replace [object Object] with a placeholder
+                msg.content = msg.content.replace(/\[object Object\]/g, 'Unknown Topic');
               }
             }
           }
@@ -137,9 +152,9 @@ export const handler = async function(event, context) {
       path: '/chat/completions',
       method: 'POST',
       headers: {
+        'Accept': 'application/json',
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'Accept': 'application/json'
+        'Authorization': `Bearer ${apiKey}`
       }
     };
 
@@ -187,14 +202,13 @@ export const handler = async function(event, context) {
               return;
             }
 
-            // Validate response structure
+            // Validate response structure according to Perplexity API
             if (!parsedData.choices?.[0]?.message?.content) {
               log('Invalid API response format: ' + JSON.stringify(parsedData), 'error');
               reject(new Error('Invalid API response format'));
               return;
             }
 
-            // Extract and validate the content
             const content = parsedData.choices[0].message.content;
             log('Extracted content: ' + content);
 
@@ -204,7 +218,6 @@ export const handler = async function(event, context) {
               return;
             }
 
-            // Try to parse the content as JSON if it looks like JSON
             let finalContent = content;
             if (content.trim().startsWith('{') && content.trim().endsWith('}')) {
               try {
