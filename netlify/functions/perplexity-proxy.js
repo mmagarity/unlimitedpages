@@ -61,7 +61,7 @@ export const handler = async function(event, context) {
       body = JSON.parse(event.body);
       
       // Ensure we're using Perplexity's model and parameters
-      body.model = "llama-3.1-sonar-small-128k-online"; // Use Perplexity's model
+      body.model = "llama-3.1-sonar-small-128k-online";
       body.temperature = body.temperature || 0.2;
       body.top_p = body.top_p || 0.9;
       body.frequency_penalty = 1;
@@ -72,24 +72,38 @@ export const handler = async function(event, context) {
         body.messages = body.messages.map(msg => {
           if (msg.content && typeof msg.content === 'string') {
             // Extract the topic from the content
-            const topicMatch = msg.content.match(/Topic:\s*(\[.*?\]|\{.*?\})/s);
+            const topicMatch = msg.content.match(/Topic:\s*(.*?)(?=\n|$)/);
             if (topicMatch) {
               try {
-                // Handle array of objects
-                const topicStr = topicMatch[1].replace(/\[object Object\]/g, '{}');
-                const topics = JSON.parse(topicStr);
-                // Get the first non-empty topic's headline
-                const headline = Array.isArray(topics) 
-                  ? topics.find(t => t && t.baseHeadline)?.baseHeadline || 'Unknown Topic'
-                  : topics.baseHeadline || 'Unknown Topic';
+                const topicStr = topicMatch[1];
+                let topic;
                 
+                // Handle array or object format
+                try {
+                  topic = JSON.parse(topicStr);
+                } catch {
+                  // If not valid JSON, use as-is
+                  topic = topicStr;
+                }
+                
+                // Extract headline from topic object or array
+                let headline;
+                if (Array.isArray(topic)) {
+                  headline = topic.find(t => t?.baseHeadline)?.baseHeadline || 'Unknown Topic';
+                } else if (typeof topic === 'object' && topic !== null) {
+                  headline = topic.baseHeadline || 'Unknown Topic';
+                } else {
+                  headline = topic || 'Unknown Topic';
+                }
+                
+                // Replace the topic in the content
                 msg.content = msg.content.replace(
-                  /Topic:\s*(\[.*?\]|\{.*?\})/s,
+                  /Topic:\s*(.*?)(?=\n|$)/,
                   `Topic: ${headline}`
                 );
               } catch (e) {
-                console.log('Failed to parse topic:', e);
-                // If parsing fails, replace [object Object] with a placeholder
+                log('Topic parsing error: ' + e.message, 'error');
+                // If parsing fails, clean up any [object Object] references
                 msg.content = msg.content.replace(/\[object Object\]/g, 'Unknown Topic');
               }
             }
@@ -114,7 +128,7 @@ export const handler = async function(event, context) {
     }
 
     // Validate API key
-    const apiKey = process.env.VITE_PERPLEXITY_API_KEY;
+    const apiKey = process.env.VITE_PERPLEXITY_API_KEY?.trim();
     if (!apiKey) {
       log('Missing Perplexity API key in environment', 'error');
       return {
